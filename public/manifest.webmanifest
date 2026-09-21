@@ -1,0 +1,10 @@
+{
+  "name": "Meet Lab.cafe",
+  "short_name": "Meet",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#111827",
+  "lang": "sk",
+  "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

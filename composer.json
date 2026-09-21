@@ -1,0 +1,31 @@
+{
+    "name": "labcafe/meet",
+    "description": "Nahrávanie, prepis a triedenie porád s AI (PHP + MySQL, mobile first)",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.1",
+        "ext-pdo_mysql": "*",
+        "ext-curl": "*",
+        "ext-mbstring": "*",
+        "ext-fileinfo": "*",
+        "ext-json": "*",
+        "anthropic-ai/sdk": "^0.50",
+        "guzzlehttp/guzzle": "^7.9"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    },
+    "scripts": {
+        "worker": "php bin/worker.php --loop",
+        "install-app": "php bin/install.php"
+    }
+}

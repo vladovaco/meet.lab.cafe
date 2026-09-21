@@ -1,0 +1,10 @@
+/vendor/
+/.env
+/storage/audio/*
+!/storage/audio/.gitkeep
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/cache/*
+.DS_Store
+*.log
+/node_modules/
