@@ -1,16 +1,11 @@
-# Nasadenie na zdieľaný hosting (bez SSH) po každom pushi do main.
-# 1) zostaví release.zip (aplikácia + vendor/), 2) cez FTP nahrá zip, deploy.php a token,
-# 3) zavolá https://DOMENA/deploy.php, ktorý archív rozbalí. .env a storage/ sa nikdy neprepíšu.
-#
+# Nasadenie cez SSH po každom pushi do main.
 # GitHub Secrets (Settings → Secrets and variables → Actions):
-#   FTP_SERVER      napr. ftp.websupport.sk (bez ftp://)
-#   FTP_USERNAME    FTP používateľ
-#   FTP_PASSWORD    FTP heslo
-#   FTP_REMOTE_DIR  koreň aplikácie na serveri, napr. /sub/meet  (adresár, v ktorom je composer.json)
-#   DEPLOY_URL      verejná adresa aplikácie, napr. https://meet.lab.cafe
-#   DEPLOY_TOKEN    ľubovoľný dlhý náhodný reťazec
-# Voliteľné: FTP_PORT (21), FTP_SSL (true/false – FTPS), FTP_VERIFY_CERT (false)
-name: Deploy (FTP)
+#   SSH_HOST   adresa servera, napr. shellserver.websupport.sk
+#   SSH_USER   SSH používateľ, napr. uid138628
+#   SSH_KEY    privátny SSH kľúč (celý obsah súboru, verejná časť musí byť v ~/.ssh/authorized_keys na serveri)
+#   APP_DIR    adresár aplikácie na serveri, napr. /data/4/a/.../lab.cafe/sub/meet  (alebo ~/lab.cafe/sub/meet)
+# Voliteľné secrets: SSH_PORT (22). Voliteľná premenná (Variables): PHP_BIN (napr. php83), ak "php" na serveri nie je 8.1+.
+name: Deploy (SSH)
 
 on:
   push:
@@ -18,46 +13,42 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-ftp
+  group: deploy
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, curl, pdo_mysql, zip
           tools: composer:v2
-
-      - name: Composer install (vendor sa nahrá na server, hosting nepotrebuje Composer)
-        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
-
+      - name: Composer validate
+        run: composer validate --no-check-publish --strict
       - name: Lint PHP
         run: find src public bin -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
 
-      - name: Zostavenie release.zip
-        run: |
-          find vendor -mindepth 3 -maxdepth 3 -type d \( -iname tests -o -iname test -o -iname docs -o -iname examples -o -name .github \) -prune -exec rm -rf {} +
-          echo "${GITHUB_SHA::8} $(date -u +%Y-%m-%dT%H:%MZ)" > VERSION
-          zip -qr release.zip . \
-            -x '.git/*' '.github/*' '.env' '.env.example' 'storage/*' 'docker/*' 'docker-compose.yml' '.dockerignore' 'README.md' 'release.zip'
-          ls -la release.zip
-
-      - name: Upload cez FTP a rozbalenie na serveri
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy cez SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          command_timeout: 15m
+          script_stop: true
+          envs: PHP_BIN
+          script: |
+            cd "${{ secrets.APP_DIR }}"
+            git fetch --quiet origin main
+            git checkout --quiet -B main origin/main
+            git reset --quiet --hard origin/main
+            PHP_BIN="${PHP_BIN:-php}" bash bin/deploy.sh
         env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-          FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
-          FTP_PORT: ${{ secrets.FTP_PORT }}
-          FTP_SSL: ${{ secrets.FTP_SSL }}
-          FTP_VERIFY_CERT: ${{ secrets.FTP_VERIFY_CERT }}
-          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
-          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
-        run: |
-          sudo apt-get update -q >/dev/null && sudo apt-get install -y -q lftp >/dev/null
-          bash bin/deploy-ftp.sh
+          PHP_BIN: ${{ vars.PHP_BIN }}
