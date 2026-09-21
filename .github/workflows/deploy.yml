@@ -1,9 +1,15 @@
-# Nasadenie na hosting cez FTP po každom pushi do vetvy main.
-# Potrebné GitHub Secrets (Settings → Secrets and variables → Actions):
-#   FTP_SERVER      napr. ftp.websupport.sk  (bez ftp://)
+# Nasadenie na zdieľaný hosting (bez SSH) po každom pushi do main.
+# 1) zostaví release.zip (aplikácia + vendor/), 2) cez FTP nahrá zip, deploy.php a token,
+# 3) zavolá https://DOMENA/deploy.php, ktorý archív rozbalí. .env a storage/ sa nikdy neprepíšu.
+#
+# GitHub Secrets (Settings → Secrets and variables → Actions):
+#   FTP_SERVER      napr. ftp.websupport.sk (bez ftp://)
 #   FTP_USERNAME    FTP používateľ
 #   FTP_PASSWORD    FTP heslo
-#   FTP_REMOTE_DIR  cieľový adresár na serveri, napr. /sub/meet/   (musí končiť lomkou)
+#   FTP_REMOTE_DIR  koreň aplikácie na serveri, napr. /sub/meet  (adresár, v ktorom je composer.json)
+#   DEPLOY_URL      verejná adresa aplikácie, napr. https://meet.lab.cafe
+#   DEPLOY_TOKEN    ľubovoľný dlhý náhodný reťazec
+# Voliteľné: FTP_PORT (21), FTP_SSL (true/false – FTPS), FTP_VERIFY_CERT (false)
 name: Deploy (FTP)
 
 on:
@@ -24,7 +30,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, curl, pdo_mysql
+          extensions: mbstring, curl, pdo_mysql, zip
           tools: composer:v2
 
       - name: Composer install (vendor sa nahrá na server, hosting nepotrebuje Composer)
@@ -33,25 +39,25 @@ jobs:
       - name: Lint PHP
         run: find src public bin -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
 
-      - name: Upload cez FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ secrets.FTP_REMOTE_DIR }}
-          protocol: ftps
-          local-dir: ./
-          state-name: .ftp-deploy-sync-state.json
-          exclude: |
-            **/.git*
-            **/.git*/**
-            .github/**
-            .env
-            .env.example
-            storage/audio/**
-            storage/logs/**
-            docker/**
-            docker-compose.yml
-            .dockerignore
-            README.md
+      - name: Zostavenie release.zip
+        run: |
+          find vendor -mindepth 3 -maxdepth 3 -type d \( -iname tests -o -iname test -o -iname docs -o -iname examples -o -name .github \) -prune -exec rm -rf {} +
+          echo "${GITHUB_SHA::8} $(date -u +%Y-%m-%dT%H:%MZ)" > VERSION
+          zip -qr release.zip . \
+            -x '.git/*' '.github/*' '.env' '.env.example' 'storage/*' 'docker/*' 'docker-compose.yml' '.dockerignore' 'README.md' 'release.zip'
+          ls -la release.zip
+
+      - name: Upload cez FTP a rozbalenie na serveri
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+          FTP_SSL: ${{ secrets.FTP_SSL }}
+          FTP_VERIFY_CERT: ${{ secrets.FTP_VERIFY_CERT }}
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          sudo apt-get update -q >/dev/null && sudo apt-get install -y -q lftp >/dev/null
+          bash bin/deploy-ftp.sh

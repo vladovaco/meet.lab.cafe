@@ -61,16 +61,35 @@ Prihláste sa a v **Nastaveniach** skontrolujte stav služieb (zelené ✅ pri p
 
 ### C) Zdieľaný hosting bez SSH (napr. Websupport) – nasadenie cez FTP z GitHubu
 
-Repozitár obsahuje workflow `.github/workflows/deploy.yml`: po každom pushi do `main` GitHub Actions spustí `composer install`, skontroluje syntax a nahrá aplikáciu **vrátane `vendor/`** cez FTPS na hosting (na serveri netreba Composer ani git). Nahrávajú sa len zmenené súbory; `.env` a `storage/` sa nikdy neprepíšu.
+Workflow `.github/workflows/deploy.yml` po každom pushi do `main`:
+1. spustí `composer install` a skontroluje syntax PHP,
+2. zabalí aplikáciu **vrátane `vendor/`** do `release.zip` (na hostingu netreba Composer ani git),
+3. cez FTP(S) nahrá iba tri súbory: `release.zip`, `public/deploy.php` a `.deploy-token` (skript `bin/deploy-ftp.sh`, nástroj `lftp` s automatickým opakovaním),
+4. zavolá `https://DOMENA/deploy.php?token=…`, ktorý archív na serveri rozbalí a zmaže.
 
-1. Na GitHube v **Settings → Secrets and variables → Actions** vytvorte secrets `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD` a `FTP_REMOTE_DIR` (cieľový adresár, napr. `/sub/meet/`, s lomkou na konci).
-2. Pushnite do `main` (alebo spustite workflow ručne cez **Actions → Deploy (FTP) → Run workflow**). Prvé nasadenie nahrá všetko, ďalšie už len zmeny.
-3. Cez FTP nahrajte do koreňa aplikácie súbor `.env` (podľa `.env.example`) s DB údajmi, API kľúčmi a náhodným `SETUP_TOKEN`.
-4. Otvorte `https://vasa-domena/setup.php?token=SETUP_TOKEN` – vytvorí tabuľky, skontroluje PHP a vytvorí admin používateľa. Potom `SETUP_TOKEN` z `.env` odstráňte.
-5. DocumentRoot subdomény nastavte na adresár `public/`.
-6. Cron bez SSH: v paneli hostingu nastavte cron (každú minútu), ktorý volá URL `https://vasa-domena/cron/run?token=CRON_TOKEN` (`CRON_TOKEN` z `.env`) a v `.env` dajte `PROCESS_MODE=cron`. Ak cron nemáte, nechajte `PROCESS_MODE=web`.
+`.env` ani `storage/` sa nikdy neprepíšu (v archíve nie sú). Celé nasadenie trvá asi minútu.
 
-Pri každej ďalšej zmene stačí push do `main`; ak sa zmenila databázová schéma, otvorte znova `setup.php?token=...` (schéma je idempotentná).
+**Nastavenie (raz):**
+
+1. Na GitHube v **Settings → Secrets and variables → Actions** vytvorte secrets (alebo naraz cez `gh secret set -f secrets.env`):
+
+   | Secret | Hodnota |
+   |---|---|
+   | `FTP_SERVER` | napr. `ftp.websupport.sk` (bez `ftp://`) |
+   | `FTP_USERNAME` | FTP používateľ |
+   | `FTP_PASSWORD` | FTP heslo |
+   | `FTP_REMOTE_DIR` | koreň aplikácie na serveri, napr. `/sub/meet` (adresár, kde bude `composer.json`) |
+   | `DEPLOY_URL` | verejná adresa aplikácie, napr. `https://meet.lab.cafe` |
+   | `DEPLOY_TOKEN` | dlhý náhodný reťazec (napr. `openssl rand -hex 32`) |
+
+   Voliteľné: `FTP_PORT` (21), `FTP_SSL` (`false` = bez TLS, ak FTPS na hostingu zlyháva), `FTP_VERIFY_CERT` (`true` = overovať certifikát).
+2. DocumentRoot subdomény nastavte na `…/public` (napr. `sub/meet/public`).
+3. Spustite nasadenie: push do `main`, alebo **Actions → Deploy (FTP) → Run workflow**.
+4. Cez FTP nahrajte do koreňa aplikácie súbor `.env` (podľa `.env.example`) s DB údajmi, API kľúčmi, `SESSION_SECRET`, `CRON_TOKEN` a `SETUP_TOKEN`.
+5. Otvorte `https://DOMENA/setup.php?token=SETUP_TOKEN` – vytvorí tabuľky, skontroluje PHP a vytvorí admina. Potom `SETUP_TOKEN` z `.env` odstráňte.
+6. Cron bez SSH: v paneli hostingu nastavte cron (každú minútu) na URL `https://DOMENA/cron/run?token=CRON_TOKEN` a v `.env` dajte `PROCESS_MODE=cron`. Bez cronu nechajte `PROCESS_MODE=web`.
+
+Pri ďalšej zmene stačí push do `main`. Ak sa zmenila databázová schéma, otvorte znova `setup.php?token=…` (schéma je idempotentná). Nasadenú verziu vidno v súbore `VERSION` na serveri a vo výstupe `deploy.php`.
 
 ### Mikrofón na mobile
 
