@@ -59,6 +59,19 @@ php bin/install.php --email=admin@lab.cafe --password=TajneHeslo
 
 Prihláste sa a v **Nastaveniach** skontrolujte stav služieb (zelené ✅ pri prepise aj AI).
 
+### C) Zdieľaný hosting bez SSH (napr. Websupport) – nasadenie cez FTP z GitHubu
+
+Repozitár obsahuje workflow `.github/workflows/deploy.yml`: po každom pushi do `main` GitHub Actions spustí `composer install`, skontroluje syntax a nahrá aplikáciu **vrátane `vendor/`** cez FTPS na hosting (na serveri netreba Composer ani git). Nahrávajú sa len zmenené súbory; `.env` a `storage/` sa nikdy neprepíšu.
+
+1. Na GitHube v **Settings → Secrets and variables → Actions** vytvorte secrets `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD` a `FTP_REMOTE_DIR` (cieľový adresár, napr. `/sub/meet/`, s lomkou na konci).
+2. Pushnite do `main` (alebo spustite workflow ručne cez **Actions → Deploy (FTP) → Run workflow**). Prvé nasadenie nahrá všetko, ďalšie už len zmeny.
+3. Cez FTP nahrajte do koreňa aplikácie súbor `.env` (podľa `.env.example`) s DB údajmi, API kľúčmi a náhodným `SETUP_TOKEN`.
+4. Otvorte `https://vasa-domena/setup.php?token=SETUP_TOKEN` – vytvorí tabuľky, skontroluje PHP a vytvorí admin používateľa. Potom `SETUP_TOKEN` z `.env` odstráňte.
+5. DocumentRoot subdomény nastavte na adresár `public/`.
+6. Cron bez SSH: v paneli hostingu nastavte cron (každú minútu), ktorý volá URL `https://vasa-domena/cron/run?token=CRON_TOKEN` (`CRON_TOKEN` z `.env`) a v `.env` dajte `PROCESS_MODE=cron`. Ak cron nemáte, nechajte `PROCESS_MODE=web`.
+
+Pri každej ďalšej zmene stačí push do `main`; ak sa zmenila databázová schéma, otvorte znova `setup.php?token=...` (schéma je idempotentná).
+
 ### Mikrofón na mobile
 
 Nahrávanie z mikrofónu vyžaduje **HTTPS** (okrem `localhost`). iOS Safari nahráva do `audio/mp4`, Android Chrome do `audio/webm` – oba formáty backend prijíma. Počas nahrávania aplikácia drží obrazovku zapnutú (Wake Lock) a ukladá dáta po 5‑sekundových blokoch.

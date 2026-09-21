@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use App\Controllers\ApiController;
 use App\Controllers\AuthController;
+use App\Controllers\CronController;
 use App\Controllers\DashboardController;
 use App\Controllers\MeetingController;
 use App\Controllers\ParticipantController;
@@ -73,6 +74,9 @@ $router->get('/search', [SearchController::class, 'index']);
 $router->get('/settings', [SettingsController::class, 'index']);
 $router->post('/settings/password', [SettingsController::class, 'changePassword']);
 $router->post('/settings/users', [SettingsController::class, 'createUser']);
+
+// Cron cez URL (hosting bez SSH)
+$router->get('/cron/run', [CronController::class, 'run'], auth: false);
 
 // JSON API (AJAX z prehliadača)
 $router->post('/api/meetings/upload', [ApiController::class, 'upload']);
