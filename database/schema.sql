@@ -167,3 +167,17 @@ CREATE TABLE IF NOT EXISTS jobs (
   INDEX idx_jobs_status (status, id),
   CONSTRAINT fk_jobs_meeting FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Záznam odoslaných e-mailov so zápisom
+CREATE TABLE IF NOT EXISTS meeting_emails (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  meeting_id INT UNSIGNED NOT NULL,
+  sent_by    INT UNSIGNED NULL,
+  recipients TEXT NOT NULL,
+  kind       ENUM('auto','manual') NOT NULL DEFAULT 'manual',
+  status     ENUM('sent','failed') NOT NULL,
+  error      TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_me_meeting (meeting_id),
+  CONSTRAINT fk_me_meeting FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

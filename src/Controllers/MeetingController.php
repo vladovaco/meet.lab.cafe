@@ -15,6 +15,8 @@ use App\Models\Job;
 use App\Models\Meeting;
 use App\Models\Participant;
 use App\Models\Tag;
+use App\Services\MeetingMailer;
+use App\Services\Mailer;
 use App\Services\Storage;
 
 final class MeetingController
@@ -68,6 +70,10 @@ final class MeetingController
             'expected'     => Meeting::expectedParticipants($id),
             'job'          => Job::latestForMeeting($id),
             'processMode'  => Config::get('process_mode'),
+            'mailEnabled'  => Mailer::enabled(),
+            'mailCandidates' => MeetingMailer::candidates($id),
+            'mailLog'      => DB::all('SELECT e.*, u.name AS user_name FROM meeting_emails e LEFT JOIN users u ON u.id = e.sent_by WHERE e.meeting_id = ? ORDER BY e.id DESC LIMIT 5', [$id]),
+            'currentUser'  => Auth::user(),
             'active'       => 'meetings',
         ]);
     }
@@ -136,6 +142,37 @@ final class MeetingController
         Job::enqueue($id, $mode);
         Flash::set('success', $mode === 'transcribe' ? 'Prepis a analýza sa spustia znova.' : 'Analýza zápisu sa spustí znova.');
         Response::redirect('/meetings/' . $id);
+    }
+
+    /** Odoslanie zápisu e-mailom vybraným rečníkom / účastníkom / adresám. */
+    public function email(Request $r): void
+    {
+        $meeting = $this->findOrFail($r);
+        $id = (int) $meeting['id'];
+        $recipients = [];
+        $ids = array_map('intval', (array) $r->input('participants', []));
+        if ($ids !== []) {
+            $in = implode(',', array_fill(0, count($ids), '?'));
+            foreach (DB::all("SELECT name, email FROM participants WHERE id IN ($in) AND email IS NOT NULL AND email <> ''", $ids) as $p) {
+                $recipients[] = ['email' => $p['email'], 'name' => $p['name']];
+            }
+        }
+        if ($r->input('me')) {
+            $u = Auth::user();
+            $recipients[] = ['email' => $u['email'], 'name' => $u['name']];
+        }
+        foreach (preg_split('/[\s,;]+/', $r->str('extra')) ?: [] as $addr) {
+            if ($addr !== '') {
+                $recipients[] = ['email' => $addr];
+            }
+        }
+        try {
+            MeetingMailer::send($id, $recipients, (bool) $r->input('transcript'), 'manual', Auth::id() ?: null, mb_substr($r->str('note'), 0, 2000));
+            Flash::set('success', 'E-mail so zápisom bol odoslaný (' . count($recipients) . ' príjemcov).');
+        } catch (\Throwable $e) {
+            Flash::set('error', $e->getMessage());
+        }
+        Response::redirect('/meetings/' . $id . '#notes');
     }
 
     /** Streamuje audio s podporou Range (kvôli skoku na časovú značku). */

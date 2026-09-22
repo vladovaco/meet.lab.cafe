@@ -31,8 +31,9 @@ try {
     } catch (\Throwable) {
         // na zdieľanom hostingu databázu vytvára admin panel – ignoruj
     }
-    DB::pdo()->exec((string) file_get_contents(Config::get('root') . '/database/schema.sql'));
-    $messages[] = 'Databázové tabuľky vytvorené / aktualizované.';
+    foreach (\App\Core\Migrator::run() as $msg) {
+        $messages[] = $msg;
+    }
 } catch (\Throwable $e) {
     $errors[] = 'Databáza: ' . $e->getMessage();
 }

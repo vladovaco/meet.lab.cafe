@@ -195,6 +195,17 @@ mark { background: #fde68a; color: #111; border-radius: 3px; padding: 0 2px; }
 .pt-icon { flex-shrink: 0; }
 .ts { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .75rem; color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); border: 0; border-radius: 6px; padding: .1rem .4rem; cursor: pointer; }
 
+/* Dialog */
+.dialog { border: 0; border-radius: var(--radius); padding: 1rem; width: min(560px, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+.dialog::backdrop { background: rgba(17,24,39,.55); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+.check-list { display: flex; flex-direction: column; gap: .2rem; }
+.check-row { display: flex; align-items: center; gap: .6rem; padding: .4rem .2rem; border-radius: 8px; cursor: pointer; font-weight: 400; }
+.check-row:hover { background: var(--bg); }
+.check-row input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--primary); }
+.check-row.is-disabled { opacity: .6; cursor: default; }
+.check-body { line-height: 1.25; }
+
 /* Tasks */
 .task-list { list-style: none; padding: 0; margin: 0; }
 .task { display: flex; gap: .6rem; padding: .6rem 0; border-bottom: 1px solid var(--border); align-items: flex-start; }

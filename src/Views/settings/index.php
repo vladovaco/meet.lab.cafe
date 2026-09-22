@@ -23,6 +23,13 @@
   </ul>
 </div>
 <?php endif; ?>
+<form method="post" action="<?= url('/settings/notify') ?>" class="card form">
+  <?= Csrf::field() ?>
+  <h2 class="h-small">E-mail so zápisom</h2>
+  <p class="hint muted" style="margin:0">Odosielanie: <?= $mailEnabled ? e($mailMode) : 'vypnuté (MAIL_ENABLED=false)' ?><?= $mailAuto ? ' · automatické odoslanie po spracovaní je zapnuté' : ' · automatické odoslanie je vypnuté (MAIL_AUTO_SEND)' ?></p>
+  <label class="switch"><input type="checkbox" name="notify_email" value="1" <?= !empty($user['notify_email']) ? 'checked' : '' ?>><span>Po dokončení spracovania mi poslať zápis a prepis na <?= e($user['email']) ?></span></label>
+  <button class="btn" type="submit">Uložiť</button>
+</form>
 <form method="post" action="<?= url('/settings/password') ?>" class="card form">
   <?= Csrf::field() ?>
   <h2 class="h-small">Zmena hesla</h2>

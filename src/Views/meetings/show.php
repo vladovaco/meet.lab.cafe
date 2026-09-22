@@ -30,6 +30,7 @@ $analysis = $m['analysis_json'] ? json_decode($m['analysis_json'], true) : null;
     <a class="btn btn-sm" href="<?= url('/meetings/' . $m['id'] . '/export.md') ?>">⬇ Zápis (.md)</a>
     <a class="btn btn-sm" href="<?= url('/meetings/' . $m['id'] . '/export.txt') ?>">⬇ Prepis (.txt)</a>
     <button type="button" class="btn btn-sm" id="copy-notes">📋 Kopírovať zápis</button>
+    <?php if (!$processing && $m['status'] !== 'error'): ?><button type="button" class="btn btn-sm" id="open-mail">✉️ Poslať e-mailom</button><?php endif; ?>
     <details class="more">
       <summary class="btn btn-sm">⋯</summary>
       <div class="more-menu">
@@ -227,6 +228,45 @@ $analysis = $m['analysis_json'] ? json_decode($m['analysis_json'], true) : null;
       <?php endforeach; ?>
     </div>
   </div>
+<?php endif; ?>
+
+<?php if (!$processing && $m['status'] !== 'error'): ?>
+<dialog id="mail-dialog" class="dialog">
+  <form method="post" action="<?= url('/meetings/' . $m['id'] . '/email') ?>" class="form">
+    <?= Csrf::field() ?>
+    <h2 class="h-small">Poslať zápis e-mailom</h2>
+    <?php if (!$mailEnabled): ?><div class="flash flash-error">Odosielanie e-mailov je na serveri vypnuté (MAIL_ENABLED).</div><?php endif; ?>
+    <fieldset class="fieldset">
+      <legend>Rečníci a účastníci porady</legend>
+      <?php if ($mailCandidates === []): ?><p class="muted small" style="margin:0">Porada nemá priradených účastníkov. Priraďte rečníkov v záložke „Rečníci“.</p><?php endif; ?>
+      <div class="check-list">
+        <?php foreach ($mailCandidates as $c): $has = !empty($c['email']); ?>
+          <label class="check-row <?= $has ? '' : 'is-disabled' ?>">
+            <input type="checkbox" name="participants[]" value="<?= $c['id'] ?>" <?= $has ? 'checked' : 'disabled' ?>>
+            <span class="avatar" style="--c:<?= e($c['color']) ?>"><?= e(initials($c['name'])) ?></span>
+            <span class="check-body"><strong><?= e($c['name']) ?></strong><?= $c['spoke'] ? ' <span class="badge">rečník</span>' : '' ?><br>
+              <span class="muted small"><?= $has ? e($c['email']) : 'bez e-mailu – <a href="' . url('/participants/' . $c['id']) . '#edit">doplniť</a>' ?></span></span>
+          </label>
+        <?php endforeach; ?>
+        <label class="check-row">
+          <input type="checkbox" name="me" value="1" checked>
+          <span class="avatar" style="--c:#111827"><?= e(initials($currentUser['name'])) ?></span>
+          <span class="check-body"><strong><?= e($currentUser['name']) ?> (ja)</strong><br><span class="muted small"><?= e($currentUser['email']) ?></span></span>
+        </label>
+      </div>
+    </fieldset>
+    <label>Ďalšie adresy <span class="muted">(oddelené čiarkou)</span><input type="text" name="extra" class="input" placeholder="meno@firma.sk, ..." inputmode="email"></label>
+    <label>Poznámka na začiatok e-mailu<textarea name="note" class="input" rows="2" placeholder="napr. Prosím o kontrolu úloh do piatku."></textarea></label>
+    <label class="switch"><input type="checkbox" name="transcript" value="1" checked><span>Priložiť celý prepis (v tele e-mailu aj ako .txt)</span></label>
+    <div class="dialog-actions">
+      <button type="button" class="btn" id="close-mail">Zrušiť</button>
+      <button type="submit" class="btn btn-primary" <?= $mailEnabled ? '' : 'disabled' ?>>Odoslať</button>
+    </div>
+    <?php if ($mailLog): ?>
+      <p class="hint muted">Naposledy: <?php foreach (array_slice($mailLog, 0, 2) as $l): ?><?= e(format_date($l['created_at'], 'j. n. H:i')) ?> <?= $l['status'] === 'sent' ? '✅' : '⚠️' ?> <?= e($l['recipients']) ?><?= $l['kind'] === 'auto' ? ' (automaticky)' : '' ?>; <?php endforeach; ?></p>
+    <?php endif; ?>
+  </form>
+</dialog>
 <?php endif; ?>
 
 <textarea id="notes-clipboard" hidden><?= e(\App\Core\View::partial('meetings/export_md', ['meeting' => $m, 'speakers' => $speakers, 'segments' => [], 'topics' => $topics, 'points' => array_merge(...array_values($points)), 'actionItems' => $actionItems, 'tags' => $tags])) ?></textarea>

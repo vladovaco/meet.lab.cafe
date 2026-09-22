@@ -128,7 +128,7 @@ Tok spracovania: upload → `meetings.status=queued` → job `transcribe` (STT, 
 
 **Rýchle výhry**
 - **Sledovanie úloh naprieč poradami** – pripomienky termínov e‑mailom / push, denný digest otvorených úloh pre každého účastníka.
-- **Odoslanie zápisu e‑mailom** účastníkom hneď po spracovaní (šablóna z Markdown exportu), export do PDF/DOCX.
+- Export zápisu do PDF/DOCX (e‑mail so zápisom už existuje).
 - **Vlastné šablóny zápisu** podľa typu porady (stand‑up, retrospektíva, stretnutie s klientom, board) – iný prompt a iná štruktúra výstupu.
 - **Prepojenie s kalendárom** (Google Calendar / Outlook): automatické predvyplnenie názvu, účastníkov a času porady z udalosti; po porade zápis späť do udalosti.
 - **Priebežné posielanie blokov nahrávky na server** (poistka aj proti strate telefónu; lokálna záloha v IndexedDB už existuje).
@@ -158,7 +158,13 @@ Tok spracovania: upload → `meetings.status=queued` → job `transcribe` (STT, 
 
 ---
 
-## 5. Bezpečnosť
+## 5. E-mail so zápisom
+
+- Po dokončení analýzy sa zápis (HTML v tele, `.md` a prepis `.txt` v prílohe) pošle automaticky autorovi porady na jeho prihlasovací e‑mail. Vypína sa globálne (`MAIL_AUTO_SEND=false`) alebo per používateľ v **Nastaveniach**.
+- Tlačidlo **✉️ Poslať e‑mailom** na porade otvorí výber príjemcov: rečníci a pozvaní účastníci s e‑mailom (bez e‑mailu sa dajú doplniť v profile účastníka), ja, ďalšie adresy, poznámka na úvod a voľba, či priložiť celý prepis.
+- Odosielanie: SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`) alebo PHP `mail()`, ak `SMTP_HOST` ostane prázdne. Odosielateľ `MAIL_FROM` by mal byť adresa na doméne hostingu, inak e‑maily končia v spame. História odoslaní je v tabuľke `meeting_emails` a v dialógu.
+
+## 6. Bezpečnosť
 
 - Prihlásenie (bcrypt), session cookie `HttpOnly`/`SameSite=Lax`, CSRF token na každý POST (formuláre aj AJAX).
 - Nahrávky sa ukladajú mimo `public/` a streamujú sa cez aplikáciu iba prihláseným.

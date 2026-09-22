@@ -52,6 +52,7 @@ $router->post('/meetings/{id}', [MeetingController::class, 'update']);
 $router->post('/meetings/{id}/delete', [MeetingController::class, 'destroy']);
 $router->post('/meetings/{id}/reprocess', [MeetingController::class, 'reprocess']);
 $router->get('/meetings/{id}/audio', [MeetingController::class, 'audio']);
+$router->post('/meetings/{id}/email', [MeetingController::class, 'email']);
 $router->get('/meetings/{id}/export.md', [MeetingController::class, 'exportMarkdown']);
 $router->get('/meetings/{id}/export.txt', [MeetingController::class, 'exportTranscript']);
 
@@ -73,6 +74,7 @@ $router->get('/tasks', [DashboardController::class, 'tasks']);
 $router->get('/search', [SearchController::class, 'index']);
 $router->get('/settings', [SettingsController::class, 'index']);
 $router->post('/settings/password', [SettingsController::class, 'changePassword']);
+$router->post('/settings/notify', [SettingsController::class, 'toggleNotify']);
 $router->post('/settings/users', [SettingsController::class, 'createUser']);
 
 // Cron cez URL (hosting bez SSH)

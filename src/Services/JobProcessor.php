@@ -271,5 +271,8 @@ final class JobProcessor
             DB::pdo()->rollBack();
             throw $e;
         }
+
+        // e-mail so zápisom autorovi porady (chyba e-mailu neovplyvní stav porady)
+        MeetingMailer::sendAuto($meetingId);
     }
 }

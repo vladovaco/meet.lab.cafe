@@ -176,6 +176,12 @@
     } catch (err) { toast(err.message, 'error'); }
   });
 
+  // ---- Dialóg e-mailu ----
+  const mailDialog = document.getElementById('mail-dialog');
+  document.getElementById('open-mail')?.addEventListener('click', () => { if (mailDialog.showModal) mailDialog.showModal(); else mailDialog.setAttribute('open', ''); });
+  document.getElementById('close-mail')?.addEventListener('click', () => mailDialog.close ? mailDialog.close() : mailDialog.removeAttribute('open'));
+  mailDialog?.addEventListener('click', (e) => { if (e.target === mailDialog) mailDialog.close(); });
+
   // ---- Kopírovanie zápisu ----
   document.getElementById('copy-notes')?.addEventListener('click', async () => {
     const text = document.getElementById('notes-clipboard')?.value || '';

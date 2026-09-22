@@ -24,9 +24,9 @@ try {
 }
 
 if (!isset($opts['skip-schema'])) {
-    $sql = file_get_contents(Config::get('root') . '/database/schema.sql');
-    DB::pdo()->exec($sql);
-    $out('Schéma databázy vytvorená/aktualizovaná.');
+    foreach (\App\Core\Migrator::run() as $msg) {
+        $out($msg);
+    }
 }
 
 $email = $opts['email'] ?? null;

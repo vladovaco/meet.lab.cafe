@@ -19,7 +19,10 @@ final class SettingsController
     {
         return View::render('settings/index', [
             'title'   => 'Nastavenia',
-            'user'    => Auth::user(),
+            'user'    => DB::one('SELECT id, email, name, role, notify_email FROM users WHERE id = ?', [Auth::id()]),
+            'mailEnabled' => \App\Services\Mailer::enabled(),
+            'mailAuto'    => (bool) Config::get('mail.auto_send'),
+            'mailMode'    => Config::get('mail.host') ? 'SMTP ' . Config::get('mail.host') : 'PHP mail()',
             'users'   => Auth::isAdmin() ? DB::all('SELECT id, email, name, role, last_login_at FROM users ORDER BY name') : [],
             'config'  => [
                 'stt_provider'   => Config::get('stt.provider'),
@@ -49,6 +52,13 @@ final class SettingsController
             DB::update('users', ['password_hash' => password_hash((string) $r->input('new'), PASSWORD_DEFAULT)], 'id = ?', [$user['id']]);
             Flash::set('success', 'Heslo bolo zmenené.');
         }
+        Response::redirect('/settings');
+    }
+
+    public function toggleNotify(Request $r): void
+    {
+        DB::update('users', ['notify_email' => $r->input('notify_email') ? 1 : 0], 'id = ?', [Auth::id()]);
+        Flash::set('success', 'Nastavenie e-mailových notifikácií bolo uložené.');
         Response::redirect('/settings');
     }
 
