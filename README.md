@@ -88,6 +88,7 @@ Ak je `php` na serveri staršie ako 8.1 (`php -v`), použite konkrétnu verziu (
 | `SSH_USER` | SSH používateľ, napr. `uid138628` |
 | `SSH_KEY` | celý obsah privátneho kľúča `~/.ssh/github-deploy` |
 | `APP_DIR` | adresár aplikácie, napr. `/data/4/a/…/lab.cafe/sub/meet` (výstup `pwd` v adresári aplikácie) |
+| `SSH_PASSWORD` | alternatíva ku kľúču: SSH heslo (stačí jedno z `SSH_KEY` / `SSH_PASSWORD`) |
 | `SSH_PORT` | voliteľné, predvolene 22 |
 
 DocumentRoot subdomény nastavte na `…/meet/public`. Cron (každú minútu): `* * * * * php ~/lab.cafe/sub/meet/bin/worker.php >> ~/lab.cafe/sub/meet/storage/logs/worker.log 2>&1`. Ak cron v paneli vie volať iba URL, použite `https://DOMENA/cron/run?token=CRON_TOKEN` (`CRON_TOKEN` v `.env`).
