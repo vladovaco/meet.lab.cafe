@@ -25,7 +25,7 @@ Prečo dve služby a nie jedna: špecializované STT modely majú výrazne lepš
 
 1. STT vráti slová s `speaker_id` (`speaker_0`, `speaker_1`…). Aplikácia ich zlúči do segmentov a spočíta, koľko každý hovoril.
 2. Claude dostane prepis + zoznam **očakávaných účastníkov** (zaškrtnutých pri vytváraní porady) + celú databázu mien a prezývok. Z kontextu odhadne, kto je ktorý label, s mierou istoty.
-3. Ak je zhoda s databázou dostatočne istá, rečník sa priradí automaticky; inak sa zobrazí ako návrh a používateľ ho jedným ťuknutím potvrdí alebo vytvorí nového účastníka. Ručne potvrdené priradenie sa pri opakovanej analýze neprepisuje.
+3. Ak je zhoda s databázou dostatočne istá, rečník sa priradí automaticky; inak sa zobrazí ako návrh a používateľ ho jedným ťuknutím potvrdí alebo vytvorí nového účastníka. Pri každom rečníkovi sú tlačidlá s krátkymi ukážkami hlasu (najdlhšie úseky z nahrávky), aby sa dal spoľahlivo rozpoznať. Ručne potvrdené priradenie sa pri opakovanej analýze neprepisuje.
 4. Priradenie sa prenesie do prepisu, úloh (úloha „speaker_1 pošle bannery“ → Jana Kováčová) a do štatistík účastníka.
 
 ---
@@ -97,7 +97,7 @@ Pri ďalšej zmene stačí push do `main`; nasadenie sa dá spustiť aj ručne c
 
 ### Mikrofón na mobile
 
-Nahrávanie z mikrofónu vyžaduje **HTTPS** (okrem `localhost`). iOS Safari nahráva do `audio/mp4`, Android Chrome do `audio/webm` – oba formáty backend prijíma. Počas nahrávania aplikácia drží obrazovku zapnutú (Wake Lock) a ukladá dáta po 5‑sekundových blokoch.
+Nahrávanie z mikrofónu vyžaduje **HTTPS** (okrem `localhost`). iOS Safari nahráva do `audio/mp4`, Android Chrome do `audio/webm` – oba formáty backend prijíma. Počas nahrávania aplikácia drží obrazovku zapnutú (Wake Lock) a každý 5‑sekundový blok hneď zálohuje do IndexedDB v prehliadači. Po vybití telefónu, páde prehliadača alebo obnovení stránky sa pri ďalšom otvorení stránky „Nová porada“ ponúkne obnova neuloženej nahrávky; záloha sa zmaže až po úspešnom uploade na server.
 
 ---
 
@@ -130,6 +130,7 @@ Tok spracovania: upload → `meetings.status=queued` → job `transcribe` (STT, 
 - **Odoslanie zápisu e‑mailom** účastníkom hneď po spracovaní (šablóna z Markdown exportu), export do PDF/DOCX.
 - **Vlastné šablóny zápisu** podľa typu porady (stand‑up, retrospektíva, stretnutie s klientom, board) – iný prompt a iná štruktúra výstupu.
 - **Prepojenie s kalendárom** (Google Calendar / Outlook): automatické predvyplnenie názvu, účastníkov a času porady z udalosti; po porade zápis späť do udalosti.
+- **Priebežné posielanie blokov nahrávky na server** (poistka aj proti strate telefónu; lokálna záloha v IndexedDB už existuje).
 - **Kapitolové značky v prehrávači** a klik na vetu v zápise → skok v audiu na miesto, kde to zaznelo (dáta už sú k dispozícii v `meeting_topics.start_sec` a `action_items.source_quote`).
 
 **Presnejšie rozpoznávanie ľudí**

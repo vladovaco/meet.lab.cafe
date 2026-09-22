@@ -63,6 +63,29 @@
     });
   }
 
+  // ---- Ukážky hlasu rečníka (prehrá úsek a zastaví sa) ----
+  let sampleStop = null, sampleBtn = null;
+  function stopSample() {
+    if (sampleBtn) { sampleBtn.classList.remove('is-playing'); sampleBtn.textContent = sampleBtn.dataset.label; }
+    sampleStop = null; sampleBtn = null;
+  }
+  document.querySelectorAll('.js-sample').forEach(b => { b.dataset.label = b.textContent; });
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('.js-sample');
+    if (!b || !player) return;
+    if (sampleBtn === b) { player.pause(); stopSample(); return; }
+    stopSample();
+    sampleBtn = b; sampleStop = parseFloat(b.dataset.end);
+    b.classList.add('is-playing'); b.textContent = '■ ' + b.dataset.label.replace(/^▶ /, '');
+    player.currentTime = parseFloat(b.dataset.start) || 0;
+    player.play().catch(() => stopSample());
+  });
+  if (player) {
+    player.addEventListener('timeupdate', () => { if (sampleStop !== null && player.currentTime >= sampleStop) { player.pause(); stopSample(); } });
+    player.addEventListener('pause', () => { if (sampleStop !== null && player.currentTime < sampleStop - 0.3) stopSample(); });
+    player.addEventListener('seeking', () => { if (sampleBtn && Math.abs(player.currentTime - parseFloat(sampleBtn.dataset.start)) > 0.5 && sampleStop !== null && player.currentTime > sampleStop) stopSample(); });
+  }
+
   // ---- Filter v prepise ----
   const filter = document.getElementById('transcript-filter');
   filter?.addEventListener('input', () => {

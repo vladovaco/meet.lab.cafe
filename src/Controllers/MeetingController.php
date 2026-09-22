@@ -47,6 +47,7 @@ final class MeetingController
         foreach ($speakers as $i => $s) {
             $speakerIndex[$s['speaker_label']] = $i;
         }
+        $segments = Meeting::segments($id);
         $keyPoints = Meeting::keyPoints($id);
         $grouped = ['key_point' => [], 'decision' => [], 'open_question' => []];
         foreach ($keyPoints as $kp) {
@@ -58,7 +59,8 @@ final class MeetingController
             'tags'         => Meeting::tags($id),
             'speakers'     => $speakers,
             'speakerIndex' => $speakerIndex,
-            'segments'     => Meeting::segments($id),
+            'segments'     => $segments,
+            'samples'      => self::speakerSamples($segments),
             'topics'       => Meeting::topics($id),
             'points'       => $grouped,
             'actionItems'  => ActionItem::forMeeting($id),
@@ -218,6 +220,36 @@ final class MeetingController
             $lines[] = sprintf('[%s] %s: %s', format_duration((float) $seg['start_sec']), $names[$seg['speaker_label']] ?? $seg['speaker_label'], $seg['text']);
         }
         Response::download(self::slug($meeting['title']) . '-prepis.txt', implode("\n", $lines));
+    }
+
+    /**
+     * Pre každého rečníka vyberie až 3 najdlhšie úseky (min. 2 s), zoradené podľa času –
+     * slúžia ako hlasové ukážky pri priraďovaní rečníka k účastníkovi.
+     * @return array<string, list<array{start: float, end: float, text: string}>>
+     */
+    public static function speakerSamples(array $segments, int $max = 3, float $minLen = 2.0, float $maxLen = 12.0): array
+    {
+        $bySpeaker = [];
+        foreach ($segments as $seg) {
+            $len = (float) $seg['end_sec'] - (float) $seg['start_sec'];
+            if ($len < $minLen) {
+                continue;
+            }
+            $bySpeaker[$seg['speaker_label'] ?? 'speaker_0'][] = [
+                'start' => (float) $seg['start_sec'],
+                'end'   => min((float) $seg['end_sec'], (float) $seg['start_sec'] + $maxLen),
+                'len'   => $len,
+                'text'  => mb_strimwidth((string) $seg['text'], 0, 70, '…'),
+            ];
+        }
+        $out = [];
+        foreach ($bySpeaker as $label => $list) {
+            usort($list, static fn($a, $b) => $b['len'] <=> $a['len']);
+            $top = array_slice($list, 0, $max);
+            usort($top, static fn($a, $b) => $a['start'] <=> $b['start']);
+            $out[$label] = $top;
+        }
+        return $out;
     }
 
     private function findOrFail(Request $r): array

@@ -191,6 +191,14 @@ $analysis = $m['analysis_json'] ? json_decode($m['analysis_json'], true) : null;
             </div>
             <div class="talk-bar"><span style="width:<?= round((float) $s['talk_seconds'] / $total * 100) ?>%;background:<?= e($sp['color']) ?>"></span></div>
             <div class="muted small"><?= e(format_duration((float) $s['talk_seconds'])) ?> · <?= (int) $s['word_count'] ?> slov · <?= round((float) $s['talk_seconds'] / $total * 100) ?> %</div>
+            <?php if (!empty($samples[$s['speaker_label']]) && $m['audio_path']): ?>
+            <div class="samples">
+              <span class="muted small">Ukážky hlasu:</span>
+              <?php foreach ($samples[$s['speaker_label']] as $k => $smp): ?>
+                <button type="button" class="btn btn-sm js-sample" data-start="<?= $smp['start'] ?>" data-end="<?= $smp['end'] ?>" title="<?= e($smp['text']) ?>">▶ <?= $k + 1 ?> · <?= e(format_duration($smp['start'])) ?></button>
+              <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
             <div class="speaker-assign">
               <select class="input input-sm js-speaker-select" data-url="<?= url('/api/meetings/' . $m['id'] . '/speakers') ?>">
                 <option value="0">– nepriradený –</option>

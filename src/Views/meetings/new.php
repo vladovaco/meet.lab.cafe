@@ -1,6 +1,12 @@
 <?php use App\Core\Csrf; ?>
 <div class="page-head"><h1>Nová porada</h1></div>
 
+<div class="card recovery" id="recovery" hidden>
+  <h2 class="h-small">⚠️ Neuložená nahrávka</h2>
+  <p class="muted small">Prehliadač našiel nahrávku, ktorá nebola uložená na server (napr. po vybití telefónu alebo páde prehliadača).</p>
+  <div id="recovery-list"></div>
+</div>
+
 <div class="card" id="recorder">
   <div class="seg" role="tablist">
     <button type="button" class="seg-btn is-active" data-mode="record">🎙 Nahrať</button>
@@ -22,7 +28,7 @@
       <audio controls id="rec-audio"></audio>
       <button type="button" class="btn btn-ghost" id="rec-discard">Zahodiť a nahrať znova</button>
     </div>
-    <p class="hint muted">Telefón nechajte odomknutý a stránku otvorenú, inak prehliadač nahrávanie preruší. Pri dlhých poradách odporúčame pripojiť nabíjačku.</p>
+    <p class="hint muted">Telefón nechajte odomknutý a stránku otvorenú, inak prehliadač nahrávanie preruší. Pri dlhých poradách odporúčame pripojiť nabíjačku. Nahrávka sa každých 5 sekúnd zálohuje do pamäte prehliadača, takže po vybití alebo páde sa dá obnoviť.</p>
   </div>
 
   <div class="mode mode-upload" hidden>
@@ -89,4 +95,4 @@
     <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn" disabled>Uložiť a spustiť prepis</button>
   </form>
 </div>
-<?php \App\Core\View::addScript('/assets/js/recorder.js'); ?>
+<?php \App\Core\View::addScript('/assets/js/recstore.js'); \App\Core\View::addScript('/assets/js/recorder.js'); ?>

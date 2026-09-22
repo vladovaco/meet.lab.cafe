@@ -8,6 +8,9 @@
   let audioCtx = null, analyser = null, rafId = null;
   let startedAt = 0, pausedTotal = 0, pauseStart = 0, timerId = null, durationSec = 0;
   let wakeLock = null;
+  let session = null;          // id nahrávky v lokálnom úložisku (IndexedDB)
+  let chunkIndex = 0;
+  const store = window.RecStore && window.RecStore.available() ? window.RecStore : null;
 
   const btnStart = $('#rec-start'), btnPause = $('#rec-pause'), btnStop = $('#rec-stop');
   const timeEl = $('#rec-time'), statusEl = $('#rec-status'), preview = $('#rec-preview'), audioEl = $('#rec-audio');
@@ -83,7 +86,22 @@
     const mimeType = pickMimeType();
     chunks = [];
     mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 64000 } : undefined);
-    mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    session = Date.now();
+    chunkIndex = 0;
+    if (store) {
+      store.createSession({ id: session, startedAt: session, mimeType: mediaRecorder.mimeType || mimeType || 'audio/webm', title: form.querySelector('[name=title]').value }).catch(() => {});
+    }
+    mediaRecorder.ondataavailable = (e) => {
+      if (!(e.data && e.data.size)) return;
+      chunks.push(e.data);
+      if (store && session) {
+        const idx = chunkIndex++;
+        const elapsed = (Date.now() - startedAt - pausedTotal) / 1000;
+        store.addChunk(session, idx, e.data)
+          .then(() => store.updateSession(session, { elapsed, chunks: idx + 1, bytes: chunks.reduce((a, b) => a + b.size, 0) }))
+          .catch(() => { statusEl.textContent = 'Pozor: lokálna záloha nahrávky zlyhala (málo miesta?). Nahráva sa ďalej.'; });
+      }
+    };
     mediaRecorder.onstop = finalize;
     mediaRecorder.start(5000); // chunk každých 5 s – pri páde ostane väčšina dát
     startedAt = Date.now(); pausedTotal = 0;
@@ -140,7 +158,11 @@
   btnStart.addEventListener('click', () => { if (mediaRecorder && mediaRecorder.state !== 'inactive') stop(); else start(); });
   btnPause.addEventListener('click', togglePause);
   btnStop.addEventListener('click', stop);
-  $('#rec-discard').addEventListener('click', () => { blob = null; preview.hidden = true; timeEl.textContent = '00:00'; statusEl.textContent = 'Pripravené.'; updateSubmit(); });
+  $('#rec-discard').addEventListener('click', () => {
+    if (!confirm('Zahodiť nahrávku? Zmaže sa aj jej lokálna záloha.')) return;
+    if (store && session) store.deleteSession(session).catch(() => {});
+    session = null; blob = null; preview.hidden = true; timeEl.textContent = '00:00'; statusEl.textContent = 'Pripravené.'; updateSubmit();
+  });
 
   // Upload súboru
   const dz = $('#dropzone'), fileInput = $('#file-input'), fileInfo = $('#file-info');
@@ -188,6 +210,60 @@
   });
   $('#new-participant').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#add-participant').click(); } });
 
+  // Obnova neuloženej nahrávky po páde prehliadača / vybití telefónu
+  async function checkRecovery() {
+    if (!store) return;
+    let sessions = [];
+    try { sessions = await store.listSessions(); } catch (e) { return; }
+    sessions = sessions.filter(s => s.chunks > 0).sort((a, b) => b.startedAt - a.startedAt);
+    if (!sessions.length) return;
+    const box = $('#recovery');
+    const list = $('#recovery-list');
+    list.innerHTML = '';
+    for (const s of sessions) {
+      const li = document.createElement('div');
+      li.className = 'recovery-item';
+      const when = new Date(s.startedAt).toLocaleString('sk-SK', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+      li.innerHTML = '<div class="recovery-info"><strong></strong><span class="muted"></span></div><div class="recovery-actions"><button type="button" class="btn btn-primary btn-sm">Obnoviť</button><button type="button" class="btn btn-ghost btn-sm">Zahodiť</button></div>';
+      li.querySelector('strong').textContent = (s.title ? s.title + ' · ' : '') + when;
+      li.querySelector('span').textContent = fmt(s.elapsed || s.chunks * 5) + ' · ' + ((s.bytes || 0) / 1048576).toFixed(1) + ' MB';
+      const [btnRestore, btnDrop] = li.querySelectorAll('button');
+      btnRestore.addEventListener('click', async () => {
+        btnRestore.disabled = true;
+        try {
+          const rows = await store.getChunks(s.id);
+          rows.sort((a, b) => a.index - b.index);
+          if (mediaRecorder && mediaRecorder.state !== 'inactive') stop();
+          chunks = rows.map(r => r.blob);
+          session = s.id; chunkIndex = rows.length;
+          durationSec = s.elapsed || rows.length * 5;
+          blob = new Blob(chunks, { type: s.mimeType || chunks[0]?.type || 'audio/webm' });
+          audioEl.src = URL.createObjectURL(blob);
+          preview.hidden = false;
+          timeEl.textContent = fmt(durationSec);
+          statusEl.textContent = 'Obnovená nahrávka: ' + fmt(durationSec) + ' · ' + (blob.size / 1048576).toFixed(1) + ' MB. Skontrolujte ju a uložte.';
+          if (s.title && !form.querySelector('[name=title]').value) form.querySelector('[name=title]').value = s.title;
+          document.querySelector('.seg-btn[data-mode=record]').click();
+          box.hidden = true;
+          updateSubmit();
+          form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (e) {
+          toast('Obnova zlyhala: ' + e.message, 'error');
+          btnRestore.disabled = false;
+        }
+      });
+      btnDrop.addEventListener('click', async () => {
+        if (!confirm('Naozaj zmazať túto neuloženú nahrávku?')) return;
+        await store.deleteSession(s.id).catch(() => {});
+        li.remove();
+        if (!list.children.length) box.hidden = true;
+      });
+      list.appendChild(li);
+    }
+    box.hidden = false;
+  }
+  checkRecovery();
+
   // Odoslanie
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -216,7 +292,8 @@
       try { r = JSON.parse(xhr.responseText); } catch (err) {}
       if (xhr.status >= 200 && xhr.status < 300 && r.url) {
         window.onbeforeunload = null;
-        location.href = r.url;
+        const go = () => { location.href = r.url; };
+        if (store && session) store.deleteSession(session).then(go, go); else go();
       } else {
         fail(r.error || ('Server vrátil chybu ' + xhr.status + (xhr.status === 413 ? ' – súbor je príliš veľký pre server.' : '')));
       }
