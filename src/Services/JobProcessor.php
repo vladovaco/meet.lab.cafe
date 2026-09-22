@@ -8,7 +8,7 @@ use App\Models\Job;
 use App\Models\Meeting;
 use App\Models\Participant;
 use App\Models\Tag;
-use App\Services\Analysis\MeetingAnalyzer;
+use App\Services\Analysis\AnalyzerFactory;
 use App\Services\Transcription\TranscriberFactory;
 
 /**
@@ -151,7 +151,7 @@ final class JobProcessor
 
         $expected = Meeting::expectedParticipants($meetingId);
         $known = DB::all('SELECT * FROM participants ORDER BY name');
-        $analyzer = self::$analyzerFactory ? (self::$analyzerFactory)() : new MeetingAnalyzer();
+        $analyzer = self::$analyzerFactory ? (self::$analyzerFactory)() : AnalyzerFactory::make();
         $analysis = $analyzer->analyze($meeting, $segments, $expected, $known);
 
         DB::pdo()->beginTransaction();

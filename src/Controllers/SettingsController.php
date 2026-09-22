@@ -11,6 +11,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\View;
 use App\Models\Job;
+use App\Services\Analysis\AnalyzerFactory;
 
 final class SettingsController
 {
@@ -23,8 +24,8 @@ final class SettingsController
             'config'  => [
                 'stt_provider'   => Config::get('stt.provider'),
                 'stt_configured' => Config::get('stt.provider') === 'assemblyai' ? (bool) Config::get('stt.assemblyai_key') : (bool) Config::get('stt.elevenlabs_key'),
-                'ai_model'       => Config::get('anthropic.model'),
-                'ai_configured'  => (bool) Config::get('anthropic.key'),
+                'ai_model'       => AnalyzerFactory::label(),
+                'ai_configured'  => AnalyzerFactory::configured(),
                 'process_mode'   => Config::get('process_mode'),
                 'max_upload_mb'  => Config::get('max_upload_mb'),
                 'php_upload_max' => ini_get('upload_max_filesize'),

@@ -36,9 +36,16 @@ final class Config
                 'assemblyai_key'      => Env::get('ASSEMBLYAI_API_KEY'),
                 'assemblyai_base_url' => rtrim(Env::get('ASSEMBLYAI_BASE_URL', 'https://api.eu.assemblyai.com'), '/'),
             ],
+            'ai' => [
+                'provider' => Env::get('AI_PROVIDER', 'claude'),
+            ],
             'anthropic' => [
                 'key'   => Env::get('ANTHROPIC_API_KEY'),
                 'model' => Env::get('ANTHROPIC_MODEL', 'claude-opus-5'),
+            ],
+            'gemini' => [
+                'key'   => Env::get('GEMINI_API_KEY'),
+                'model' => Env::get('GEMINI_MODEL', 'gemini-3.8-flash'),
             ],
             'process_mode'  => Env::get('PROCESS_MODE', 'web'),
             'max_upload_mb' => Env::int('MAX_UPLOAD_MB', 300),
