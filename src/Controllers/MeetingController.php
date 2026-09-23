@@ -15,6 +15,7 @@ use App\Models\Job;
 use App\Models\Meeting;
 use App\Models\Participant;
 use App\Models\Tag;
+use App\Services\CostTracker;
 use App\Services\MeetingMailer;
 use App\Services\Mailer;
 use App\Services\Storage;
@@ -74,6 +75,8 @@ final class MeetingController
             'mailCandidates' => MeetingMailer::candidates($id),
             'mailLog'      => DB::all('SELECT e.*, u.name AS user_name FROM meeting_emails e LEFT JOIN users u ON u.id = e.sent_by WHERE e.meeting_id = ? ORDER BY e.id DESC LIMIT 5', [$id]),
             'currentUser'  => Auth::user(),
+            'costs'        => Auth::isAdmin() ? CostTracker::forMeeting($id) : [],
+            'costTotal'    => Auth::isAdmin() ? CostTracker::totalForMeeting($id) : 0.0,
             'active'       => 'meetings',
         ]);
     }

@@ -129,6 +129,7 @@ final class JobProcessor
             DB::pdo()->rollBack();
             throw $e;
         }
+        CostTracker::recordTranscription($meetingId, $transcriber->name(), $result->duration ?? ($meeting['audio_duration'] !== null ? (float) $meeting['audio_duration'] : null));
         Job::enqueue($meetingId, 'analyze');
     }
 
@@ -270,6 +271,10 @@ final class JobProcessor
         } catch (\Throwable $e) {
             DB::pdo()->rollBack();
             throw $e;
+        }
+
+        if (!empty($analysis['_usage'])) {
+            CostTracker::recordAnalysis($meetingId, (string) \App\Core\Config::get('ai.provider', 'claude'), (array) $analysis['_usage']);
         }
 
         // e-mail so zápisom autorovi porady (chyba e-mailu neovplyvní stav porady)

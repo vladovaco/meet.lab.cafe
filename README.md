@@ -164,7 +164,11 @@ Tok spracovania: upload → `meetings.status=queued` → job `transcribe` (STT, 
 - Tlačidlo **✉️ Poslať e‑mailom** na porade otvorí výber príjemcov: rečníci a pozvaní účastníci s e‑mailom (bez e‑mailu sa dajú doplniť v profile účastníka), ja, ďalšie adresy, poznámka na úvod a voľba, či priložiť celý prepis.
 - Odosielanie: SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`) alebo PHP `mail()`, ak `SMTP_HOST` ostane prázdne. Odosielateľ `MAIL_FROM` by mal byť adresa na doméne hostingu, inak e‑maily končia v spame. História odoslaní je v tabuľke `meeting_emails` a v dialógu.
 
-## 6. Bezpečnosť
+## 6. Sledovanie nákladov (admin)
+
+Po každom prepise a analýze sa do tabuľky `meeting_costs` zapíše odhad ceny: dĺžka audia × sadzba poskytovateľa STT, resp. vstupné a výstupné tokeny × sadzba modelu. Sadzby sú v `config/pricing.php` (USD, stav september 2026) a treba ich priebežne aktualizovať. Admin vidí odhad pri každej porade (karta „Odhad nákladov“ v zápise) a súhrn po mesiacoch, poskytovateľoch a poradách v **Nastavenia → Náklady na spracovanie** (`/admin/costs`). Opakované spracovanie sa započítava znova, takže súčet zodpovedá skutočnej spotrebe.
+
+## 7. Bezpečnosť
 
 - Prihlásenie (bcrypt), session cookie `HttpOnly`/`SameSite=Lax`, CSRF token na každý POST (formuláre aj AJAX).
 - Nahrávky sa ukladajú mimo `public/` a streamujú sa cez aplikáciu iba prihláseným.

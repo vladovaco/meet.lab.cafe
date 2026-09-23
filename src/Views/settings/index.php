@@ -39,6 +39,10 @@
 </form>
 <?php if ($users): ?>
 <div class="card">
+  <h2 class="h-small">Administrácia</h2>
+  <a class="btn" href="<?= url('/admin/costs') ?>">💰 Náklady na spracovanie</a>
+</div>
+<div class="card">
   <h2 class="h-small">Používatelia</h2>
   <ul class="simple-list">
     <?php foreach ($users as $u): ?><li><span><?= e($u['name']) ?> <span class="muted small"><?= e($u['email']) ?> · <?= e($u['role']) ?></span></span><span class="muted small"><?= $u['last_login_at'] ? e(format_date($u['last_login_at'])) : 'neprihlásený' ?></span></li><?php endforeach; ?>

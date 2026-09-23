@@ -195,6 +195,13 @@ mark { background: #fde68a; color: #111; border-radius: 3px; padding: 0 2px; }
 .pt-icon { flex-shrink: 0; }
 .ts { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .75rem; color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); border: 0; border-radius: 6px; padding: .1rem .4rem; cursor: pointer; }
 
+/* Tables (admin) */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.table th, .table td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.table th { color: var(--muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .03em; }
+.cost-card { border-left: 4px solid #f59e0b; }
+
 /* Dialog */
 .dialog { border: 0; border-radius: var(--radius); padding: 1rem; width: min(560px, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
 .dialog::backdrop { background: rgba(17,24,39,.55); }

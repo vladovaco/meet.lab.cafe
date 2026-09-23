@@ -181,3 +181,21 @@ CREATE TABLE IF NOT EXISTS meeting_emails (
   INDEX idx_me_meeting (meeting_id),
   CONSTRAINT fk_me_meeting FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Odhad nákladov na spracovanie (STT a LLM) – každý beh sa zapíše zvlášť
+CREATE TABLE IF NOT EXISTS meeting_costs (
+  id            INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  meeting_id    INT UNSIGNED NOT NULL,
+  step          ENUM('transcribe','analyze') NOT NULL,
+  provider      VARCHAR(40) NOT NULL,
+  model         VARCHAR(80) NULL,
+  audio_seconds DECIMAL(9,2) NULL,
+  input_tokens  INT UNSIGNED NULL,
+  output_tokens INT UNSIGNED NULL,
+  cost_usd      DECIMAL(10,5) NOT NULL DEFAULT 0,
+  priced        TINYINT(1) NOT NULL DEFAULT 1 COMMENT '0 = model nie je v cenníku, cena je 0',
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_mc_meeting (meeting_id),
+  INDEX idx_mc_created (created_at),
+  CONSTRAINT fk_mc_meeting FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

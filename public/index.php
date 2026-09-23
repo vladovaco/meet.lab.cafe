@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use App\Controllers\AdminController;
 use App\Controllers\ApiController;
 use App\Controllers\AuthController;
 use App\Controllers\CronController;
@@ -75,6 +76,7 @@ $router->get('/search', [SearchController::class, 'index']);
 $router->get('/settings', [SettingsController::class, 'index']);
 $router->post('/settings/password', [SettingsController::class, 'changePassword']);
 $router->post('/settings/notify', [SettingsController::class, 'toggleNotify']);
+$router->get('/admin/costs', [AdminController::class, 'costs']);
 $router->post('/settings/users', [SettingsController::class, 'createUser']);
 
 // Cron cez URL (hosting bez SSH)

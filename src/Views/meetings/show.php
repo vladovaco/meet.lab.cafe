@@ -117,6 +117,18 @@ $analysis = $m['analysis_json'] ? json_decode($m['analysis_json'], true) : null;
     </ul>
   </div>
   <?php endif; ?>
+  <?php if ($costs): ?>
+  <div class="card cost-card">
+    <h2 class="h-small">Odhad nákladov <span class="muted">(vidí iba admin)</span></h2>
+    <ul class="kv">
+      <?php foreach ($costs as $c): ?>
+        <li><span><?= $c['step'] === 'transcribe' ? 'Prepis' : 'Analýza' ?> · <?= e($c['provider']) ?><?= $c['model'] ? ' · ' . e($c['model']) : '' ?><br><span class="muted small"><?= $c['step'] === 'transcribe' ? e(format_duration((float) $c['audio_seconds'])) . ' audia' : number_format((int) $c['input_tokens'], 0, ',', ' ') . ' vstupných + ' . number_format((int) $c['output_tokens'], 0, ',', ' ') . ' výstupných tokenov' ?> · <?= e(format_date($c['created_at'], 'j. n. H:i')) ?></span></span><strong><?= $c['priced'] ? e(\App\Services\CostTracker::format((float) $c['cost_usd'])) : '<span class="muted">nie je v cenníku</span>' ?></strong></li>
+      <?php endforeach; ?>
+      <li><span><strong>Spolu</strong></span><strong><?= e(\App\Services\CostTracker::format($costTotal)) ?></strong></li>
+    </ul>
+    <p class="hint muted">Odhad podľa <code>config/pricing.php</code>; každé opakované spracovanie sa započíta. <a href="<?= url('/admin/costs') ?>">Prehľad nákladov</a></p>
+  </div>
+  <?php endif; ?>
 </section>
 
 <section class="tab-panel" data-panel="tasks">
