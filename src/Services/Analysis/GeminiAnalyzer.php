@@ -5,7 +5,7 @@ namespace App\Services\Analysis;
 
 use App\Core\Config;
 use App\Services\ConfigurationException;
-use GuzzleHttp\Client;
+use App\Services\Http;
 
 /**
  * Alternatíva ku Claude: Google Gemini API (generateContent) so štruktúrovaným JSON výstupom.
@@ -42,7 +42,7 @@ final class GeminiAnalyzer implements AnalyzerInterface
             ],
         ];
 
-        $client = new Client(['base_uri' => $this->baseUrl, 'timeout' => 900, 'connect_timeout' => 30, 'http_errors' => false]);
+        $client = Http::client(1800, ['base_uri' => $this->baseUrl]);
         $response = $client->post('/v1beta/models/' . rawurlencode($this->model) . ':generateContent', [
             'headers' => ['x-goog-api-key' => $this->apiKey, 'Content-Type' => 'application/json'],
             'json'    => $body,

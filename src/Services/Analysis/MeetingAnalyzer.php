@@ -7,6 +7,7 @@ use Anthropic\Client;
 use Anthropic\Lib\Streaming\MessageAccumulator;
 use App\Core\Config;
 use App\Services\ConfigurationException;
+use App\Services\Http;
 
 /**
  * Zo surového diarizovaného prepisu vytvorí štruktúrovaný zápis pomocou Claude API:
@@ -24,7 +25,8 @@ final class MeetingAnalyzer implements AnalyzerInterface
         if ($apiKey === '') {
             throw new ConfigurationException('Chýba ANTHROPIC_API_KEY v .env');
         }
-        $this->client = new Client(apiKey: $apiKey);
+        // vlastný HTTP klient s 30-min limitom (SDK by inak použil Guzzle bez timeoutu → "Unable to read from stream")
+        $this->client = new Client(apiKey: $apiKey, requestOptions: ['transporter' => Http::client(1800), 'timeout' => 1800.0]);
         $this->model = $model ?? (string) Config::get('anthropic.model', 'claude-opus-5');
     }
 
@@ -40,19 +42,28 @@ final class MeetingAnalyzer implements AnalyzerInterface
         $system = AnalysisPrompt::system(AnalysisPrompt::language($meeting));
         $user = AnalysisPrompt::user($meeting, $segments, $expectedParticipants, $knownParticipants);
 
-        $stream = $this->client->messages->createStream(
-            maxTokens: 32000,
-            messages: [['role' => 'user', 'content' => $user]],
-            model: $this->model,
-            system: [['type' => 'text', 'text' => $system]],
-            thinking: ['type' => 'adaptive'],
-            outputConfig: ['format' => ['type' => 'json_schema', 'schema' => self::schema()]],
-        );
-        $acc = MessageAccumulator::forMessages();
-        foreach ($stream as $event) {
-            $acc->accumulate($event);
+        $params = [
+            'maxTokens'    => 32000,
+            'messages'     => [['role' => 'user', 'content' => $user]],
+            'model'        => $this->model,
+            'system'       => [['type' => 'text', 'text' => $system]],
+            'thinking'     => ['type' => 'adaptive'],
+            'outputConfig' => ['format' => ['type' => 'json_schema', 'schema' => self::schema()]],
+        ];
+        try {
+            $stream = $this->client->messages->createStream(...$params);
+            $acc = MessageAccumulator::forMessages();
+            foreach ($stream as $event) {
+                $acc->accumulate($event);
+            }
+            $message = $acc->message();
+        } catch (\Anthropic\Core\Exceptions\APIStatusException $e) {
+            throw $e; // chyba API (401, 429, 500…) – nemá zmysel opakovať inak
+        } catch (\Throwable $e) {
+            // prerušený stream (timeout, sieť) – skús ešte raz bez streamovania
+            error_log('[analyzer] stream zlyhal, skúšam bez streamu: ' . $e->getMessage());
+            $message = $this->client->messages->create(...$params);
         }
-        $message = $acc->message();
 
         if ($message->stopReason === 'refusal') {
             throw new \RuntimeException('Model odmietol spracovať prepis (' . ($message->stopDetails?->category ?? 'bez kategórie') . ').');

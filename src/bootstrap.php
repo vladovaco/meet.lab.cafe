@@ -12,6 +12,8 @@ Env::load($root . '/.env');
 Config::init($root);
 
 date_default_timezone_set((string) Config::get('timezone'));
+// dlhé volania AI API (streamovanie) – PHP stream inak vyprší po 60 s bez dát
+ini_set('default_socket_timeout', '1800');
 mb_internal_encoding('UTF-8');
 
 if (Config::get('env') === 'development') {

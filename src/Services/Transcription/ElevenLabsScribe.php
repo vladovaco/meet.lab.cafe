@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace App\Services\Transcription;
 
-use GuzzleHttp\Client;
+use App\Services\Http;
 
 /**
  * ElevenLabs Scribe (speech-to-text) – 90+ jazykov vrátane slovenčiny,
@@ -26,7 +26,7 @@ final class ElevenLabsScribe implements TranscriberInterface
 
     public function transcribe(string $filePath, ?string $language, ?int $numSpeakers = null): TranscriptResult
     {
-        $client = new Client(['base_uri' => $this->baseUrl, 'timeout' => 1800, 'connect_timeout' => 30]);
+        $client = Http::client(1800, ['base_uri' => $this->baseUrl]);
         $multipart = [
             ['name' => 'model_id', 'contents' => $this->modelId],
             ['name' => 'diarize', 'contents' => 'true'],

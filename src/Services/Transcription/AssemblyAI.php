@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace App\Services\Transcription;
 
-use GuzzleHttp\Client;
+use App\Services\Http;
 
 /**
  * AssemblyAI – alternatívny poskytovateľ (EU endpoint, diarizácia cez speaker_labels).
@@ -24,12 +24,7 @@ final class AssemblyAI implements TranscriberInterface
 
     public function transcribe(string $filePath, ?string $language, ?int $numSpeakers = null): TranscriptResult
     {
-        $client = new Client([
-            'base_uri' => $this->baseUrl,
-            'timeout'  => 1800,
-            'headers'  => ['authorization' => $this->apiKey],
-            'http_errors' => false,
-        ]);
+        $client = Http::client(1800, ['base_uri' => $this->baseUrl, 'headers' => ['authorization' => $this->apiKey]]);
 
         // 1) upload súboru
         $up = $client->post('/v2/upload', [
