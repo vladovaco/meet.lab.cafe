@@ -121,7 +121,7 @@ final class Meeting
 
     public static function segments(int $meetingId): array
     {
-        return DB::all('SELECT * FROM transcript_segments WHERE meeting_id = ? ORDER BY position', [$meetingId]);
+        return DB::all('SELECT * FROM transcript_segments WHERE meeting_id = ? ORDER BY start_sec, position', [$meetingId]);
     }
 
     public static function topics(int $meetingId): array
@@ -145,9 +145,12 @@ final class Meeting
         if ($m === null) {
             return;
         }
-        DB::run('DELETE FROM meetings WHERE id = ?', [$id]);
+        $files = AudioPart::files($id);
         if (!empty($m['audio_path'])) {
-            $file = \App\Core\Config::get('storage_path') . '/' . $m['audio_path'];
+            $files[] = \App\Services\Storage::absolute($m['audio_path']);
+        }
+        DB::run('DELETE FROM meetings WHERE id = ?', [$id]);
+        foreach (array_unique($files) as $file) {
             if (is_file($file)) {
                 @unlink($file);
             }

@@ -23,6 +23,7 @@ Pravidlá:
 - open_questions: veci, ktoré ostali nedoriešené.
 - action_items: konkrétne úlohy. assignee = meno osoby tak, ako sa dá z rozhovoru odvodiť (alebo label rečníka, ak meno nepoznáš, napr. "speaker_1"); ak nikto nie je zodpovedný, null. due_date vo formáte YYYY-MM-DD iba ak zaznel termín (relatívne termíny ako "do piatku" prepočítaj podľa dátumu porady), inak null. source_quote = krátky doslovný úryvok z prepisu, z ktorého úloha vyplýva.
 - speakers: pre každý label rečníka odhadni skutočné meno podľa kontextu (oslovenia ako "Peter, čo ty na to", sebapredstavenie, kto koho oslovuje). Preferuj mená zo zoznamu očakávaných účastníkov alebo databázy. confidence 0–1. Ak meno nevieš odhadnúť, name = null.
+- Porada môže byť nahraná vo viacerých častiach (nahrávanie sa zastavilo a pokračovalo). Začiatok ďalšej časti je v prepise označený riadkom "--- Časť N ---". Rečníci ďalších častí majú labely s predponou (p2_speaker_0, p3_speaker_1 …), pretože rozpoznávanie rečníkov prebehlo v každej časti samostatne – ten istý človek môže mať v rôznych častiach iný label. V speakers uveď každý label zvlášť a rovnakému človeku daj vo všetkých častiach rovnaké meno. Zápis (summary, topics, úlohy…) vytvor z celej porady ako jedného celku; časové značky sú už prepočítané na spoločnú časovú os.
 - tags: 2–5 krátkych tematických štítkov (jedno- až dvojslovné, malé písmená).
 - title_suggestion: výstižný názov porady (max 8 slov).
 Odpovedz výhradne JSON objektom podľa zadanej schémy.
@@ -69,7 +70,13 @@ USR;
     public static function formatTranscript(array $segments): string
     {
         $lines = [];
+        $part = 1;
         foreach ($segments as $s) {
+            $p = \App\Models\AudioPart::positionOfLabel($s['speaker'] ?? null);
+            if ($p > $part) {
+                $part = $p;
+                $lines[] = "--- Časť $part ---";
+            }
             $t = (int) $s['start'];
             $lines[] = sprintf('[%02d:%02d] %s: %s', intdiv($t, 60), $t % 60, $s['speaker'] ?? 'speaker_0', $s['text']);
         }

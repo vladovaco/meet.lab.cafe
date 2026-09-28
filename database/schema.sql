@@ -199,3 +199,29 @@ CREATE TABLE IF NOT EXISTS meeting_costs (
   INDEX idx_mc_created (created_at),
   CONSTRAINT fk_mc_meeting FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Časti nahrávky porady. Po zastavení sa dá v nahrávaní pokračovať – každé pokračovanie je ďalší
+-- audio súbor tej istej porady (spojiť ich do jedného súboru bez prekódovania nejde). Prepis
+-- všetkých častí tvorí jednu časovú os: offset_sec = súčet dĺžok predchádzajúcich častí.
+CREATE TABLE IF NOT EXISTS meeting_audio (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  meeting_id     INT UNSIGNED NOT NULL,
+  position       SMALLINT UNSIGNED NOT NULL COMMENT 'poradie časti od 1',
+  source         ENUM('record','upload') NOT NULL DEFAULT 'upload',
+  path           VARCHAR(255) NOT NULL,
+  mime           VARCHAR(80) NULL,
+  size           BIGINT UNSIGNED NULL,
+  duration       DECIMAL(9,2) NULL,
+  offset_sec     DECIMAL(9,2) NOT NULL DEFAULT 0,
+  transcribed_at DATETIME NULL COMMENT 'NULL = časť ešte nebola prepísaná',
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_meeting_audio (meeting_id, position),
+  CONSTRAINT fk_ma_meeting FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Staršie porady (jeden súbor v meetings.audio_path) → časť 1
+INSERT INTO meeting_audio (meeting_id, position, source, path, mime, size, duration, transcribed_at)
+SELECT m.id, 1, m.source, m.audio_path, m.audio_mime, m.audio_size, m.audio_duration,
+       IF(m.transcript_text IS NULL, NULL, m.updated_at)
+FROM meetings m
+WHERE m.audio_path IS NOT NULL AND NOT EXISTS (SELECT 1 FROM meeting_audio a WHERE a.meeting_id = m.id);

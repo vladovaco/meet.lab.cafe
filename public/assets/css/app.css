@@ -138,6 +138,7 @@ mark { background: #fde68a; color: #111; border-radius: 3px; padding: 0 2px; }
 #rec-wave { width: 100%; height: 80px; display: block; }
 .rec-time { font-size: 2.4rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
 .rec-status { font-size: .85rem; min-height: 1.3em; }
+.rec-status.is-warning { color: var(--danger, #dc2626); font-weight: 600; }
 .rec-controls { display: flex; justify-content: center; align-items: center; gap: 1rem; margin: 1rem 0; }
 .rec-btn { width: 76px; height: 76px; border-radius: 50%; border: 4px solid var(--border); background: var(--surface); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .rec-dot { width: 34px; height: 34px; border-radius: 50%; background: var(--danger); transition: all .2s; }
@@ -260,3 +261,9 @@ mark { background: #fde68a; color: #111; border-radius: 3px; padding: 0 2px; }
 .person-body { min-width: 0; flex: 1; }
 .person-stats { display: flex; gap: .6rem; font-size: .8rem; color: var(--muted); flex-wrap: wrap; margin-top: .2rem; }
 .person-head { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+.audio-parts { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin-top: .4rem; }
+.audio-parts .btn.is-active { border-color: var(--primary); color: var(--primary); }
+.rec-parts { display: grid; gap: .5rem; margin-bottom: .75rem; }
+.rec-part { display: grid; gap: .25rem; padding: .5rem; border: 1px solid var(--border, #e5e7eb); border-radius: 10px; }
+.rec-part-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; font-size: .9rem; }
+.rec-part audio { width: 100%; }

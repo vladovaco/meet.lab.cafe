@@ -100,6 +100,15 @@ Pri ďalšej zmene stačí push do `main`; nasadenie sa dá spustiť aj ručne c
 
 Nahrávanie z mikrofónu vyžaduje **HTTPS** (okrem `localhost`). iOS Safari nahráva do `audio/mp4`, Android Chrome do `audio/webm` – oba formáty backend prijíma. Počas nahrávania aplikácia drží obrazovku zapnutú (Wake Lock) a každý 5‑sekundový blok hneď zálohuje do IndexedDB v prehliadači. Po vybití telefónu, páde prehliadača alebo obnovení stránky sa pri ďalšom otvorení stránky „Nová porada“ ponúkne obnova neuloženej nahrávky; záloha sa zmaže až po úspešnom uploade na server.
 
+### Pokračovanie v nahrávaní (viac častí jednej porady)
+
+Po stlačení **Zastaviť** sa dá v nahrávaní pokračovať – ďalším stlačením tlačidla nahrávania (pred uložením), alebo neskôr cez **🎙 Pokračovať v nahrávaní** na detaile porady. Dva záznamy z `MediaRecorder` sa nedajú spojiť do jedného súboru bez prekódovania (každý má vlastnú hlavičku a časovú os; na hostingu nie je ffmpeg), preto sa každé pokračovanie uloží ako **ďalšia časť nahrávky tej istej porady** (tabuľka `meeting_audio`).
+
+- Prepisuje sa len nová časť; už prepísané časti, ručné úpravy prepisu a potvrdené priradenia rečníkov ostanú.
+- Segmenty novej časti sa posunú o súčet dĺžok predchádzajúcich častí → prepis, časové značky, témy aj ukážky hlasu tvoria jednu súvislú časovú os. Prehrávač pri skoku na čas prepne na správnu časť a po skončení časti pokračuje ďalšou.
+- Diarizácia prebieha v každej časti zvlášť, preto majú rečníci ďalších častí labely `p2_speaker_0`, `p3_speaker_1` …; AI analýza dostane v prepise predel `--- Časť N ---` a pokyn, aby rovnakému človeku dala vo všetkých častiach rovnaké meno. Zápis sa po každom doplnení vytvorí znova z celej porady.
+- „Znovu prepísať audio“ prepíše všetky časti odznova.
+
 ---
 
 ## 3. Štruktúra projektu

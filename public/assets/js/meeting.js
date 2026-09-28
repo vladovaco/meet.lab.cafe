@@ -38,19 +38,47 @@
   }
 
   // ---- Prehrávač + skok na čas + sledovanie ----
+  // Nahrávka môže mať viac častí (pokračovanie po zastavení). Časy v prepise sú na spoločnej časovej osi,
+  // prehrávač preto prepína súbory: globálny čas = offset časti + čas v rámci časti.
   const player = document.getElementById('player');
+  const P = (() => {
+    if (!player) return null;
+    let parts = [];
+    try { parts = JSON.parse(player.dataset.parts || '[]'); } catch (e) { /* ignore */ }
+    if (!parts.length) parts = [{ url: player.getAttribute('src'), offset: 0 }];
+    let idx = 0;
+    const partBtns = document.querySelectorAll('.js-part');
+    function load(i, local, play) {
+      if (i !== idx) {
+        idx = i; player.src = parts[i].url;
+        partBtns.forEach(b => b.classList.toggle('is-active', parseInt(b.dataset.part, 10) === idx));
+      }
+      const go = () => { player.currentTime = local; if (play) player.play().catch(() => {}); };
+      if (player.readyState >= 1) go(); else player.addEventListener('loadedmetadata', go, { once: true });
+    }
+    function indexAt(t) {
+      let i = 0;
+      parts.forEach((p, k) => { if (t >= p.offset - 0.05) i = k; });
+      return i;
+    }
+    player.addEventListener('ended', () => { if (idx < parts.length - 1) load(idx + 1, 0, true); });
+    partBtns.forEach(b => b.addEventListener('click', () => load(parseInt(b.dataset.part, 10), 0, true)));
+    return {
+      time: () => parts[idx].offset + player.currentTime,
+      seek: (t, play = true) => { const i = indexAt(t); load(i, Math.max(0, t - parts[i].offset), play); },
+    };
+  })();
   document.addEventListener('click', (e) => {
     const b = e.target.closest('.js-seek');
-    if (!b || !player) return;
-    player.currentTime = parseFloat(b.dataset.t) || 0;
-    player.play().catch(() => {});
+    if (!b || !P) return;
+    P.seek(parseFloat(b.dataset.t) || 0);
   });
   const rows = Array.from(document.querySelectorAll('#transcript .seg-row'));
   const follow = document.getElementById('follow-audio');
-  if (player && rows.length) {
+  if (P && rows.length) {
     let current = null;
     player.addEventListener('timeupdate', () => {
-      const t = player.currentTime;
+      const t = P.time();
       const row = rows.find(r => t >= parseFloat(r.dataset.start) && t < parseFloat(r.dataset.end) + 0.5);
       if (row && row !== current) {
         if (current) current.classList.remove('is-current');
@@ -72,18 +100,17 @@
   document.querySelectorAll('.js-sample').forEach(b => { b.dataset.label = b.textContent; });
   document.addEventListener('click', (e) => {
     const b = e.target.closest('.js-sample');
-    if (!b || !player) return;
+    if (!b || !P) return;
     if (sampleBtn === b) { player.pause(); stopSample(); return; }
     stopSample();
     sampleBtn = b; sampleStop = parseFloat(b.dataset.end);
     b.classList.add('is-playing'); b.textContent = '■ ' + b.dataset.label.replace(/^▶ /, '');
-    player.currentTime = parseFloat(b.dataset.start) || 0;
-    player.play().catch(() => stopSample());
+    P.seek(parseFloat(b.dataset.start) || 0);
   });
-  if (player) {
-    player.addEventListener('timeupdate', () => { if (sampleStop !== null && player.currentTime >= sampleStop) { player.pause(); stopSample(); } });
-    player.addEventListener('pause', () => { if (sampleStop !== null && player.currentTime < sampleStop - 0.3) stopSample(); });
-    player.addEventListener('seeking', () => { if (sampleBtn && Math.abs(player.currentTime - parseFloat(sampleBtn.dataset.start)) > 0.5 && sampleStop !== null && player.currentTime > sampleStop) stopSample(); });
+  if (P) {
+    player.addEventListener('timeupdate', () => { if (sampleStop !== null && P.time() >= sampleStop) { player.pause(); stopSample(); } });
+    player.addEventListener('pause', () => { if (sampleStop !== null && P.time() < sampleStop - 0.3 && !player.seeking) stopSample(); });
+    player.addEventListener('seeking', () => { if (sampleBtn && sampleStop !== null && P.time() > sampleStop) stopSample(); });
   }
 
   // ---- Filter v prepise ----
