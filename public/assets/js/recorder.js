@@ -140,9 +140,18 @@
       }
     };
     // Ak OS odoberie mikrofón (hovor, Siri, iná aplikácia), stopa skončí – MediaRecorder sa zastaví sám.
-    stream.getAudioTracks().forEach(t => t.addEventListener('ended', () => {
-      if (!userStopped && mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-    }));
+    stream.getAudioTracks().forEach(t => {
+      t.addEventListener('ended', () => {
+        if (!userStopped && mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+      });
+      // mute = zariadenie dočasne neposiela zvuk (stlmený mikrofón, iná aplikácia ho prevzala) – nahráva sa ticho
+      t.addEventListener('mute', () => {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') warn('Pozor: mikrofón prestal posielať zvuk (stlmený, odpojený alebo ho používa iná aplikácia). Nahráva sa ticho.');
+      });
+      t.addEventListener('unmute', () => {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') { statusEl.classList.remove('is-warning'); statusEl.textContent = 'Mikrofón opäť funguje. Nahráva sa… ' + recordedMb() + ' MB'; }
+      });
+    });
     mediaRecorder.start(5000); // chunk každých 5 s – pri páde ostane väčšina dát
     startedAt = Date.now(); lastChunkAt = startedAt;
     timerId = setInterval(tick, 500);
@@ -200,6 +209,18 @@
     statusEl.textContent = 'Nahrávka hotová: ' + fmt(durationSec) + ' · ' + (blob.size / 1048576).toFixed(1) + ' MB. Vyplňte údaje a uložte.';
     updateSubmit();
     form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // Zmena zvukových zariadení (Bluetooth slúchadlá, dokovacia stanica, webkamera) môže nahrávaný mikrofón odpojiť.
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', () => {
+      if (!mediaRecorder || mediaRecorder.state === 'inactive' || !stream) return;
+      setTimeout(() => {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive' && stream.getAudioTracks().some(t => t.readyState === 'ended' || t.muted)) {
+          warn('Zvukové zariadenie sa zmenilo a mikrofón nenahráva. Skontrolujte slúchadlá/mikrofón.');
+        }
+      }, 1000);
+    });
   }
 
   // Zámok obrazovky sa pri skrytí stránky uvoľní – po návrate ho treba vyžiadať znova.
