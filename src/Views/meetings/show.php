@@ -22,6 +22,7 @@ $analysis = $m['analysis_json'] ? json_decode($m['analysis_json'], true) : null;
     <span>📅 <?= e(format_date($m['meeting_date'], 'l j. n. Y · H:i')) ?></span>
     <?php if ($m['location']): ?><span>📍 <?= e($m['location']) ?></span><?php endif; ?>
     <?php if ($m['audio_duration']): ?><span>⏱ <?= e(format_duration((float) $m['audio_duration'])) ?></span><?php endif; ?>
+    <?php if ($m['audio_size']): ?><span title="Veľkosť nahrávky">💾 <?= e(number_format((int) $m['audio_size'] / 1048576, 1, ',', ' ')) ?> MB</span><?php endif; ?>
     <?php if ($m['folder_name']): ?><span class="chip" style="--c:<?= e($m['folder_color']) ?>">📁 <?= e($m['folder_name']) ?></span><?php endif; ?>
     <?php foreach ($tags as $t): ?><a class="chip chip-tag" style="--c:<?= e($t['color']) ?>" href="<?= url('/?tag=' . $t['id']) ?>">#<?= e($t['name']) ?></a><?php endforeach; ?>
   </div>

@@ -6,10 +6,13 @@
   let mode = 'record';
   let mediaRecorder = null, stream = null, chunks = [], blob = null, file = null;
   let audioCtx = null, analyser = null, rafId = null;
-  let startedAt = 0, pausedTotal = 0, pauseStart = 0, timerId = null, durationSec = 0;
+  let startedAt = 0, timerId = null, durationSec = 0;
   let wakeLock = null;
   let session = null;          // id nahrávky v lokálnom úložisku (IndexedDB)
   let chunkIndex = 0;
+  let userStopped = false;     // stop vyvolal používateľ (inak ide o prerušenie prehliadačom/OS)
+  let paused = false;
+  let lastChunkAt = 0, hiddenAt = 0, hiddenCount = 0, stallWarned = false;
   const store = window.RecStore && window.RecStore.available() ? window.RecStore : null;
 
   const btnStart = $('#rec-start'), btnPause = $('#rec-pause'), btnStop = $('#rec-stop');
@@ -45,9 +48,25 @@
     return (h ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
   }
 
+  function recordedMb() {
+    return (chunks.reduce((a, b) => a + b.size, 0) / 1048576).toFixed(1);
+  }
+
+  function warn(msg) {
+    statusEl.textContent = msg;
+    statusEl.classList.add('is-warning');
+    toast(msg, 'error');
+    try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch (e) {}
+  }
+
   function tick() {
-    const elapsed = (Date.now() - startedAt - pausedTotal) / 1000;
+    const elapsed = (Date.now() - startedAt) / 1000;
     timeEl.textContent = fmt(elapsed);
+    // Strážca: MediaRecorder posiela blok každých 5 s. Ak dlho nič neprišlo, mikrofón nenahráva.
+    if (!stallWarned && mediaRecorder && mediaRecorder.state === 'recording' && !document.hidden && Date.now() - lastChunkAt > 15000) {
+      stallWarned = true;
+      warn('Pozor: z mikrofónu neprichádzajú žiadne dáta. Nahrávanie pravdepodobne nefunguje – zastavte ho a začnite znova.');
+    }
   }
 
   function draw() {
@@ -85,6 +104,8 @@
     }
     const mimeType = pickMimeType();
     chunks = [];
+    userStopped = false; paused = false; stallWarned = false;
+    statusEl.classList.remove('is-warning');
     mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 64000 } : undefined);
     session = Date.now();
     chunkIndex = 0;
@@ -94,17 +115,36 @@
     mediaRecorder.ondataavailable = (e) => {
       if (!(e.data && e.data.size)) return;
       chunks.push(e.data);
+      lastChunkAt = Date.now();
+      if (!paused && !statusEl.classList.contains('is-warning')) {
+        statusEl.textContent = 'Nahráva sa… ' + recordedMb() + ' MB (' + (mediaRecorder.mimeType || 'predvolený formát') + ')';
+      }
       if (store && session) {
         const idx = chunkIndex++;
-        const elapsed = (Date.now() - startedAt - pausedTotal) / 1000;
+        const elapsed = (Date.now() - startedAt) / 1000;
         store.addChunk(session, idx, e.data)
           .then(() => store.updateSession(session, { elapsed, chunks: idx + 1, bytes: chunks.reduce((a, b) => a + b.size, 0) }))
           .catch(() => { statusEl.textContent = 'Pozor: lokálna záloha nahrávky zlyhala (málo miesta?). Nahráva sa ďalej.'; });
       }
     };
-    mediaRecorder.onstop = finalize;
+    mediaRecorder.onerror = (e) => {
+      warn('Chyba nahrávania: ' + ((e.error && e.error.message) || 'neznáma') + '. Uložená časť zostane zachovaná.');
+    };
+    mediaRecorder.onstop = () => {
+      const interrupted = !userStopped;
+      if (interrupted) durationSec = (Date.now() - startedAt) / 1000;
+      cleanup();
+      finalize();
+      if (interrupted) {
+        warn('Nahrávanie prerušil prehliadač alebo systém (hovor, iná aplikácia s mikrofónom, zamknutie obrazovky) po ' + fmt(durationSec) + '. Zachytená časť je nižšie – uložte ju a pokračujte novou nahrávkou.');
+      }
+    };
+    // Ak OS odoberie mikrofón (hovor, Siri, iná aplikácia), stopa skončí – MediaRecorder sa zastaví sám.
+    stream.getAudioTracks().forEach(t => t.addEventListener('ended', () => {
+      if (!userStopped && mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    }));
     mediaRecorder.start(5000); // chunk každých 5 s – pri páde ostane väčšina dát
-    startedAt = Date.now(); pausedTotal = 0;
+    startedAt = Date.now(); lastChunkAt = startedAt;
     timerId = setInterval(tick, 500);
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -117,30 +157,34 @@
     btnStart.setAttribute('aria-label', 'Nahráva sa');
     btnPause.hidden = false; btnStop.hidden = false;
     preview.hidden = true; blob = null; updateSubmit();
-    statusEl.textContent = 'Nahráva sa… (' + (mediaRecorder.mimeType || 'predvolený formát') + ')';
+    statusEl.textContent = 'Nahráva sa… (' + (mediaRecorder.mimeType || 'predvolený formát') + '). Nechajte obrazovku zapnutú a stránku otvorenú.';
     window.onbeforeunload = () => 'Nahrávanie prebieha. Naozaj chcete odísť?';
   }
 
+  /* Pauza = stlmenie mikrofónu, MediaRecorder beží ďalej (počas pauzy sa nahráva ticho).
+   * MediaRecorder.pause()/resume() je na mobiloch (najmä Safari/iOS) nespoľahlivé – po obnovení
+   * vznikne súbor, z ktorého sa prehrá/prepíše len úsek pred pauzou. */
   function togglePause() {
-    if (!mediaRecorder) return;
-    if (mediaRecorder.state === 'recording') {
-      mediaRecorder.pause(); pauseStart = Date.now();
-      btnPause.textContent = '▶ Pokračovať'; statusEl.textContent = 'Pozastavené.';
-    } else if (mediaRecorder.state === 'paused') {
-      mediaRecorder.resume(); pausedTotal += Date.now() - pauseStart;
-      btnPause.textContent = '⏸ Pauza'; statusEl.textContent = 'Nahráva sa…';
-    }
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+    paused = !paused;
+    stream.getAudioTracks().forEach(t => { t.enabled = !paused; });
+    btnPause.textContent = paused ? '▶ Pokračovať' : '⏸ Pauza';
+    statusEl.textContent = paused ? 'Pozastavené – mikrofón je stlmený.' : 'Nahráva sa… ' + recordedMb() + ' MB';
   }
 
-  function stop() {
-    if (!mediaRecorder) return;
-    durationSec = (Date.now() - startedAt - pausedTotal) / 1000;
-    mediaRecorder.stop();
-    stream.getTracks().forEach(t => t.stop());
+  function cleanup() {
+    if (stream) stream.getTracks().forEach(t => t.stop());
     clearInterval(timerId); cancelAnimationFrame(rafId);
     if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; analyser = null; }
     if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
     window.onbeforeunload = null;
+  }
+
+  function stop() {
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+    userStopped = true;
+    durationSec = (Date.now() - startedAt) / 1000;
+    mediaRecorder.stop(); // onstop → cleanup + finalize
   }
 
   function finalize() {
@@ -149,11 +193,34 @@
     audioEl.src = URL.createObjectURL(blob);
     preview.hidden = false;
     btnStart.classList.remove('is-recording');
+    btnStart.setAttribute('aria-label', 'Začať nahrávať');
     btnPause.hidden = true; btnStop.hidden = true; btnPause.textContent = '⏸ Pauza';
+    paused = false;
+    statusEl.classList.remove('is-warning');
     statusEl.textContent = 'Nahrávka hotová: ' + fmt(durationSec) + ' · ' + (blob.size / 1048576).toFixed(1) + ' MB. Vyplňte údaje a uložte.';
     updateSubmit();
     form.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  // Zámok obrazovky sa pri skrytí stránky uvoľní – po návrate ho treba vyžiadať znova.
+  // Zároveň zistíme, či počas skrytia prichádzali dáta (mobilné prehliadače často na pozadí mikrofón zastavia).
+  document.addEventListener('visibilitychange', () => {
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+    if (document.hidden) {
+      hiddenAt = Date.now(); hiddenCount = chunks.length;
+      return;
+    }
+    requestWakeLock();
+    const away = Date.now() - hiddenAt, since = hiddenAt, count = hiddenCount;
+    hiddenAt = 0;
+    // krátko počkáme – dáta nazbierané na pozadí môžu doraziť až po návrate
+    if (since && away > 15000) setTimeout(() => {
+      if (chunks.length === count && mediaRecorder && mediaRecorder.state !== 'inactive') {
+        warn('Kým bola obrazovka zamknutá alebo stránka na pozadí (' + fmt(away / 1000) + '), prehliadač nenahrával. Nechajte obrazovku počas porady zapnutú.');
+      }
+    }, 2500);
+    lastChunkAt = Math.max(lastChunkAt, Date.now() - 5000);
+  });
 
   btnStart.addEventListener('click', () => { if (mediaRecorder && mediaRecorder.state !== 'inactive') stop(); else start(); });
   btnPause.addEventListener('click', togglePause);
