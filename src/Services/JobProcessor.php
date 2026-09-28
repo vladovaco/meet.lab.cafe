@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Core\Database as DB;
+use App\Models\AudioPart;
 use App\Models\Job;
 use App\Models\Meeting;
 use App\Models\Participant;
@@ -76,61 +77,112 @@ final class JobProcessor
         return $done;
     }
 
+    /**
+     * Prepis všetkých ešte neprepísaných častí nahrávky. Už prepísané časti (a ich ručne upravené
+     * segmenty a priradenia rečníkov) ostávajú; nová časť sa pripojí s časovým posunom = súčet dĺžok
+     * predchádzajúcich častí, takže prepis tvorí jednu súvislú časovú os.
+     */
     public static function transcribe(int $meetingId): void
     {
         $meeting = Meeting::find($meetingId);
-        if ($meeting === null || empty($meeting['audio_path'])) {
-            throw new \RuntimeException('Porada alebo audio neexistuje.');
+        if ($meeting === null) {
+            throw new \RuntimeException('Porada neexistuje.');
         }
-        $file = Storage::absolute($meeting['audio_path']);
-        if (!is_file($file)) {
-            throw new \RuntimeException('Audio súbor sa nenašiel: ' . $meeting['audio_path']);
+        $parts = AudioPart::forMeeting($meetingId);
+        if ($parts === []) {
+            throw new \RuntimeException('Porada nemá žiadnu nahrávku.');
+        }
+        foreach ($parts as $p) {
+            if ($p['transcribed_at'] === null && !is_file(Storage::absolute($p['path']))) {
+                throw new \RuntimeException('Audio súbor sa nenašiel: ' . $p['path']);
+            }
+        }
+        $pending = array_filter($parts, static fn($p) => $p['transcribed_at'] === null);
+        if ($pending === []) {
+            Job::enqueue($meetingId, 'analyze');
+            return;
         }
         Meeting::setStatus($meetingId, 'transcribing');
+        if (count($pending) === count($parts)) {
+            // úplný (nový) prepis – začíname od nuly
+            DB::run('DELETE FROM transcript_segments WHERE meeting_id = ?', [$meetingId]);
+            DB::run('DELETE FROM meeting_speakers WHERE meeting_id = ?', [$meetingId]);
+        }
 
         $expected = Meeting::expectedParticipants($meetingId);
         $transcriber = self::$transcriberFactory ? (self::$transcriberFactory)() : TranscriberFactory::make();
-        $result = $transcriber->transcribe($file, $meeting['language'] ?: null, $expected !== [] ? count($expected) : null);
+        $language = $meeting['language'] ?: null;
+        $offset = 0.0;
+        foreach ($parts as $part) {
+            $pos = (int) $part['position'];
+            if ($part['transcribed_at'] !== null) {
+                $offset = (float) $part['offset_sec'] + self::partDuration($meetingId, $part);
+                continue;
+            }
+            $result = $transcriber->transcribe(Storage::absolute($part['path']), $language, $expected !== [] ? count($expected) : null);
+            $language = $language ?? ($result->language ?: null);
+            $lastEnd = 0.0;
+            foreach ($result->segments as $sg) {
+                $lastEnd = max($lastEnd, (float) $sg['end']);
+            }
+            $duration = $result->duration ?? ($part['duration'] !== null ? (float) $part['duration'] : $lastEnd);
 
-        DB::pdo()->beginTransaction();
-        try {
-            DB::run('DELETE FROM transcript_segments WHERE meeting_id = ?', [$meetingId]);
-            DB::run('DELETE FROM meeting_speakers WHERE meeting_id = ?', [$meetingId]);
-            $pos = 0;
-            foreach ($result->segments as $s) {
-                DB::insert('transcript_segments', [
-                    'meeting_id'    => $meetingId,
-                    'position'      => $pos++,
-                    'speaker_label' => $s['speaker'] ?? 'speaker_0',
-                    'start_sec'     => round($s['start'], 2),
-                    'end_sec'       => round($s['end'], 2),
-                    'text'          => $s['text'],
-                ]);
+            DB::pdo()->beginTransaction();
+            try {
+                $next = (int) (DB::one('SELECT COALESCE(MAX(position), -1) AS p FROM transcript_segments WHERE meeting_id = ?', [$meetingId])['p'] ?? -1) + 1;
+                foreach ($result->segments as $sg) {
+                    DB::insert('transcript_segments', [
+                        'meeting_id'    => $meetingId,
+                        'position'      => $next++,
+                        'speaker_label' => AudioPart::labelFor($pos, $sg['speaker'] ?? 'speaker_0'),
+                        'start_sec'     => round($offset + $sg['start'], 2),
+                        'end_sec'       => round($offset + $sg['end'], 2),
+                        'text'          => $sg['text'],
+                    ]);
+                }
+                foreach ($result->speakerStats() as $label => $st) {
+                    DB::run(
+                        'INSERT INTO meeting_speakers (meeting_id, speaker_label, talk_seconds, word_count) VALUES (?, ?, ?, ?)
+                         ON DUPLICATE KEY UPDATE talk_seconds = VALUES(talk_seconds), word_count = VALUES(word_count)',
+                        [$meetingId, AudioPart::labelFor($pos, $label), round($st['talk_seconds'], 2), $st['word_count']]
+                    );
+                }
+                DB::update('meeting_audio', [
+                    'duration'       => round($duration, 2),
+                    'offset_sec'     => round($offset, 2),
+                    'transcribed_at' => gmdate('Y-m-d H:i:s'),
+                ], 'id = ?', [$part['id']]);
+                DB::pdo()->commit();
+            } catch (\Throwable $e) {
+                DB::pdo()->rollBack();
+                throw $e;
             }
-            foreach ($result->speakerStats() as $label => $st) {
-                DB::insert('meeting_speakers', [
-                    'meeting_id'    => $meetingId,
-                    'speaker_label' => $label,
-                    'talk_seconds'  => round($st['talk_seconds'], 2),
-                    'word_count'    => $st['word_count'],
-                ]);
-            }
-            DB::update('meetings', [
-                'transcript_text' => $result->text,
-                'language'        => $result->language ?: $meeting['language'],
-                'audio_duration'  => $result->duration ?? $meeting['audio_duration'],
-                'stt_provider'    => $transcriber->name(),
-                'stt_job_id'      => $result->providerJobId,
-                'status'          => 'transcribed',
-                'error_message'   => null,
-            ], 'id = ?', [$meetingId]);
-            DB::pdo()->commit();
-        } catch (\Throwable $e) {
-            DB::pdo()->rollBack();
-            throw $e;
+            CostTracker::recordTranscription($meetingId, $transcriber->name(), $duration);
+            $offset += $duration;
         }
-        CostTracker::recordTranscription($meetingId, $transcriber->name(), $result->duration ?? ($meeting['audio_duration'] !== null ? (float) $meeting['audio_duration'] : null));
+
+        AudioPart::syncMeeting($meetingId);
+        $texts = array_map(static fn($s) => (string) $s['text'], Meeting::segments($meetingId));
+        DB::update('meetings', [
+            'transcript_text' => implode("\n", $texts),
+            'language'        => $language ?: $meeting['language'],
+            'stt_provider'    => $transcriber->name(),
+            'status'          => 'transcribed',
+            'error_message'   => null,
+        ], 'id = ?', [$meetingId]);
         Job::enqueue($meetingId, 'analyze');
+    }
+
+    /** Dĺžka už prepísanej časti; ak chýba, odhad podľa posledného segmentu v jej úseku. */
+    private static function partDuration(int $meetingId, array $part): float
+    {
+        if ($part['duration'] !== null) {
+            return (float) $part['duration'];
+        }
+        $row = (int) $part['position'] <= 1
+            ? DB::one('SELECT MAX(end_sec) AS e FROM transcript_segments WHERE meeting_id = ? AND speaker_label NOT REGEXP "^p[0-9]+_"', [$meetingId])
+            : DB::one('SELECT MAX(end_sec) AS e FROM transcript_segments WHERE meeting_id = ? AND speaker_label LIKE ?', [$meetingId, 'p' . (int) $part['position'] . '\\_%']);
+        return max(0.0, (float) ($row['e'] ?? 0) - (float) $part['offset_sec']);
     }
 
     public static function analyze(int $meetingId): void

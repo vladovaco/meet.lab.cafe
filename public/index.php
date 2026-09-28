@@ -53,6 +53,7 @@ $router->post('/meetings/{id}', [MeetingController::class, 'update']);
 $router->post('/meetings/{id}/delete', [MeetingController::class, 'destroy']);
 $router->post('/meetings/{id}/reprocess', [MeetingController::class, 'reprocess']);
 $router->get('/meetings/{id}/audio', [MeetingController::class, 'audio']);
+$router->get('/meetings/{id}/continue', [MeetingController::class, 'continueRecording']);
 $router->post('/meetings/{id}/email', [MeetingController::class, 'email']);
 $router->get('/meetings/{id}/export.md', [MeetingController::class, 'exportMarkdown']);
 $router->get('/meetings/{id}/export.txt', [MeetingController::class, 'exportTranscript']);
@@ -85,6 +86,7 @@ $router->get('/cron/run', [CronController::class, 'run'], auth: false);
 // JSON API (AJAX z prehliadača)
 $router->post('/api/meetings/upload', [ApiController::class, 'upload']);
 $router->get('/api/meetings/{id}/status', [ApiController::class, 'status']);
+$router->post('/api/meetings/{id}/audio', [ApiController::class, 'appendAudio']);
 $router->post('/api/jobs/run', [ApiController::class, 'runJobs']);
 $router->post('/api/action-items/{id}/toggle', [ApiController::class, 'toggleActionItem']);
 $router->post('/api/action-items/{id}/update', [ApiController::class, 'updateActionItem']);

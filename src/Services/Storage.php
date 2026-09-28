@@ -56,6 +56,30 @@ final class Storage
         return ['path' => $rel, 'mime' => $mime, 'size' => (int) $file['size']];
     }
 
+    /**
+     * Zjednotí $_FILES['audio'] (jeden súbor aj pole audio[]) na zoznam súborov.
+     * @return list<array{tmp_name:string,name:string,size:int,error:int}>
+     */
+    public static function normalizeFiles(mixed $entry): array
+    {
+        if (!is_array($entry) || !isset($entry['name'])) {
+            return [];
+        }
+        if (!is_array($entry['name'])) {
+            return [$entry];
+        }
+        $out = [];
+        foreach (array_keys($entry['name']) as $i) {
+            $out[] = [
+                'name'     => (string) $entry['name'][$i],
+                'tmp_name' => (string) $entry['tmp_name'][$i],
+                'size'     => (int) $entry['size'][$i],
+                'error'    => (int) $entry['error'][$i],
+            ];
+        }
+        return $out;
+    }
+
     public static function absolute(string $relative): string
     {
         return rtrim((string) Config::get('storage_path'), '/') . '/' . ltrim($relative, '/');

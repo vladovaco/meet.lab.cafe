@@ -1,5 +1,16 @@
-<?php use App\Core\Csrf; ?>
+<?php use App\Core\Csrf;
+$appendTo ??= null;
+$parts ??= [];
+?>
+<?php if ($appendTo): ?>
+<div class="page-head">
+  <a class="back" href="<?= url('/meetings/' . $appendTo['id']) ?>">‹ <?= e($appendTo['title']) ?></a>
+  <h1>Pokračovať v nahrávaní</h1>
+  <p class="muted">Nová nahrávka sa pridá do porady ako časť <?= count($parts) + 1 ?><?= $appendTo['audio_duration'] ? ' (doteraz nahraté ' . e(format_duration((float) $appendTo['audio_duration'])) . ')' : '' ?>. Prepíše sa len nová časť a zápis sa potom vytvorí z celej porady.</p>
+</div>
+<?php else: ?>
 <div class="page-head"><h1>Nová porada</h1></div>
+<?php endif; ?>
 
 <div class="card recovery" id="recovery" hidden>
   <h2 class="h-small">⚠️ Neuložená nahrávka</h2>
@@ -22,11 +33,12 @@
     <div class="rec-controls">
       <button type="button" class="rec-btn" id="rec-start" aria-label="Začať nahrávať"><span class="rec-dot"></span></button>
       <button type="button" class="btn" id="rec-pause" hidden>⏸ Pauza</button>
-      <button type="button" class="btn btn-danger" id="rec-stop" hidden>■ Ukončiť</button>
+      <button type="button" class="btn btn-danger" id="rec-stop" hidden>■ Zastaviť</button>
     </div>
     <div class="rec-preview" id="rec-preview" hidden>
-      <audio controls id="rec-audio"></audio>
-      <button type="button" class="btn btn-ghost" id="rec-discard">Zahodiť a nahrať znova</button>
+      <div class="rec-parts" id="rec-parts"></div>
+      <p class="hint muted">Chcete pokračovať? Stlačte znova tlačidlo nahrávania – pridá sa ďalšia časť tej istej porady.</p>
+      <button type="button" class="btn btn-ghost" id="rec-discard">Zahodiť všetko a nahrať znova</button>
     </div>
     <p class="hint muted">Telefón nechajte odomknutý a stránku otvorenú, inak prehliadač nahrávanie preruší. Pri dlhých poradách odporúčame pripojiť nabíjačku. Nahrávka sa každých 5 sekúnd zálohuje do pamäte prehliadača, takže po vybití alebo páde sa dá obnoviť.</p>
   </div>
@@ -41,8 +53,9 @@
     <div class="file-info muted" id="file-info" hidden></div>
   </div>
 
-  <form id="meeting-form" class="form" autocomplete="off">
+  <form id="meeting-form" class="form" autocomplete="off"<?= $appendTo ? ' data-action="/api/meetings/' . (int) $appendTo['id'] . '/audio"' : '' ?>>
     <?= Csrf::field() ?>
+    <?php if (!$appendTo): ?>
     <label>Názov porady<input type="text" name="title" class="input" placeholder="napr. Týždenná porada tímu (AI navrhne názov, ak necháte prázdne)"></label>
     <div class="grid-2">
       <label>Dátum a čas<input type="datetime-local" name="meeting_date" class="input" value="<?= date('Y-m-d\TH:i') ?>"></label>
@@ -90,9 +103,11 @@
       <input type="text" name="new_tags" class="input" placeholder="Nové štítky oddelené čiarkou">
     </fieldset>
 
+    <?php endif; ?>
+
     <div class="progress" id="upload-progress" hidden><div class="progress-bar"></div><span class="progress-label">Nahráva sa…</span></div>
     <div class="form-error" id="form-error" hidden></div>
-    <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn" disabled>Uložiť a spustiť prepis</button>
+    <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn" disabled><?= $appendTo ? 'Pridať do porady a spustiť prepis' : 'Uložiť a spustiť prepis' ?></button>
   </form>
 </div>
 <?php \App\Core\View::addScript('/assets/js/recstore.js'); \App\Core\View::addScript('/assets/js/recorder.js'); ?>

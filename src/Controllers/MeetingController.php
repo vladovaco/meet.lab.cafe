@@ -11,6 +11,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\View;
 use App\Models\ActionItem;
+use App\Models\AudioPart;
 use App\Models\Job;
 use App\Models\Meeting;
 use App\Models\Participant;
@@ -32,6 +33,23 @@ final class MeetingController
             'maxUploadMb'  => Config::get('max_upload_mb'),
             'defaultLang'  => Config::get('language'),
             'active'       => 'new',
+        ]);
+    }
+
+    /** Pokračovanie v nahrávaní existujúcej porady – ďalšia časť nahrávky. */
+    public function continueRecording(Request $r): string
+    {
+        $meeting = $this->findOrFail($r);
+        return View::render('meetings/new', [
+            'title'        => 'Pokračovať v nahrávaní',
+            'appendTo'     => $meeting,
+            'parts'        => AudioPart::forMeeting((int) $meeting['id']),
+            'folders'      => [],
+            'tags'         => [],
+            'participants' => [],
+            'maxUploadMb'  => Config::get('max_upload_mb'),
+            'defaultLang'  => Config::get('language'),
+            'active'       => 'meetings',
         ]);
     }
 
@@ -65,6 +83,7 @@ final class MeetingController
             'segments'     => $segments,
             'samples'      => self::speakerSamples($segments),
             'topics'       => Meeting::topics($id),
+            'parts'        => AudioPart::forMeeting($id),
             'points'       => $grouped,
             'actionItems'  => ActionItem::forMeeting($id),
             'participants' => Participant::all(),
@@ -141,6 +160,9 @@ final class MeetingController
             $mode = 'transcribe';
         }
         DB::run('UPDATE jobs SET status = "failed" WHERE meeting_id = ? AND status = "pending"', [$id]);
+        if ($mode === 'transcribe') {
+            AudioPart::resetTranscription($id);
+        }
         Meeting::setStatus($id, 'queued');
         Job::enqueue($id, $mode);
         Flash::set('success', $mode === 'transcribe' ? 'Prepis a analýza sa spustia znova.' : 'Analýza zápisu sa spustí znova.');
@@ -182,10 +204,13 @@ final class MeetingController
     public function audio(Request $r): void
     {
         $meeting = $this->findOrFail($r);
-        if (empty($meeting['audio_path'])) {
+        $part = AudioPart::find((int) $meeting['id'], max(1, $r->int('part', 1)));
+        $path = $part['path'] ?? ($r->int('part', 1) <= 1 ? $meeting['audio_path'] : null);
+        if (empty($path)) {
             Response::notFound('Audio nie je k dispozícii');
         }
-        $file = Storage::absolute($meeting['audio_path']);
+        $meeting['audio_mime'] = $part['mime'] ?? $meeting['audio_mime'];
+        $file = Storage::absolute($path);
         if (!is_file($file)) {
             Response::notFound('Audio súbor sa nenašiel');
         }

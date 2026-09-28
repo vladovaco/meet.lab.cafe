@@ -12,23 +12,24 @@ use App\Models\ActionItem;
 use App\Models\Job;
 use App\Models\Meeting;
 use App\Models\Participant;
+use App\Models\AudioPart;
 use App\Models\Tag;
 use App\Services\JobProcessor;
 use App\Services\Storage;
 
 final class ApiController
 {
-    /** Nahratie audia (z mikrofónu alebo súboru) + vytvorenie porady + zaradenie do fronty. */
+    /**
+     * Nahratie audia (z mikrofónu alebo súboru) + vytvorenie porady + zaradenie do fronty.
+     * Nahrávka môže mať viac častí (audio[] + durations[]), ak sa po zastavení pokračovalo v nahrávaní.
+     */
     public function upload(Request $r): void
     {
-        if (empty($r->files['audio'])) {
+        $files = Storage::normalizeFiles($r->files['audio'] ?? null);
+        if ($files === []) {
             Response::json(['error' => 'Chýba audio súbor.'], 422);
         }
-        try {
-            $stored = Storage::storeUpload($r->files['audio']);
-        } catch (\RuntimeException $e) {
-            Response::json(['error' => $e->getMessage()], 422);
-        }
+        $stored = self::storeFiles($files);
         $tz = new \DateTimeZone((string) Config::get('timezone'));
         try {
             $dt = new \DateTimeImmutable($r->str('meeting_date') ?: 'now', $tz);
@@ -39,8 +40,8 @@ final class ApiController
         if ($title === '') {
             $title = 'Porada ' . $dt->format('j. n. Y H:i');
         }
-        $duration = $r->input('duration');
         $lang = $r->str('language');
+        $source = $r->str('source') === 'record' ? 'record' : 'upload';
 
         $id = DB::insert('meetings', [
             'created_by'     => Auth::id() ?: null,
@@ -49,13 +50,13 @@ final class ApiController
             'meeting_date'   => $dt->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s'),
             'location'       => mb_substr($r->str('location'), 0, 160) ?: null,
             'language'       => $lang !== '' && $lang !== 'auto' ? mb_substr($lang, 0, 8) : null,
-            'source'         => $r->str('source') === 'record' ? 'record' : 'upload',
+            'source'         => $source,
             'status'         => 'queued',
-            'audio_path'     => $stored['path'],
-            'audio_mime'     => $stored['mime'],
-            'audio_size'     => $stored['size'],
-            'audio_duration' => is_numeric($duration) && $duration > 0 ? round((float) $duration, 2) : null,
+            'audio_path'     => $stored[0]['path'],
+            'audio_mime'     => $stored[0]['mime'],
+            'audio_size'     => $stored[0]['size'],
         ]);
+        self::addParts($id, $stored, $source, $r);
         $tagIds = array_map('intval', (array) $r->input('tags', []));
         foreach (array_filter(array_map('trim', explode(',', $r->str('new_tags')))) as $name) {
             $tagIds[] = Tag::ensure($name);
@@ -65,6 +66,55 @@ final class ApiController
         Job::enqueue($id, 'transcribe');
 
         Response::json(['ok' => true, 'id' => $id, 'url' => url('/meetings/' . $id)]);
+    }
+
+    /** Pokračovanie v nahrávaní: pridá ďalšiu časť (časti) k existujúcej porade a prepíše len ju. */
+    public function appendAudio(Request $r): void
+    {
+        $meeting = Meeting::find((int) $r->param('id'));
+        if ($meeting === null) {
+            Response::json(['error' => 'Porada sa nenašla.'], 404);
+        }
+        $id = (int) $meeting['id'];
+        $files = Storage::normalizeFiles($r->files['audio'] ?? null);
+        if ($files === []) {
+            Response::json(['error' => 'Chýba audio súbor.'], 422);
+        }
+        $stored = self::storeFiles($files);
+        self::addParts($id, $stored, $r->str('source') === 'record' ? 'record' : 'upload', $r);
+        Meeting::setStatus($id, 'queued');
+        // aj keď práve beží prepis, nová časť potrebuje vlastnú úlohu (bežiaca ju už nevidí)
+        if (DB::one('SELECT id FROM jobs WHERE meeting_id = ? AND type = "transcribe" AND status = "pending"', [$id]) === null) {
+            DB::insert('jobs', ['meeting_id' => $id, 'type' => 'transcribe']);
+        }
+        Response::json(['ok' => true, 'id' => $id, 'url' => url('/meetings/' . $id)]);
+    }
+
+    /** @return list<array{path:string,mime:string,size:int}> */
+    private static function storeFiles(array $files): array
+    {
+        $stored = [];
+        try {
+            foreach ($files as $f) {
+                $stored[] = Storage::storeUpload($f);
+            }
+        } catch (\RuntimeException $e) {
+            foreach ($stored as $s) {
+                @unlink(Storage::absolute($s['path']));
+            }
+            Response::json(['error' => $e->getMessage()], 422);
+        }
+        return $stored;
+    }
+
+    private static function addParts(int $meetingId, array $stored, string $source, Request $r): void
+    {
+        $durations = (array) $r->input('durations', []);
+        $single = $r->input('duration');
+        foreach ($stored as $i => $s) {
+            $d = $durations[$i] ?? ($i === 0 ? $single : null);
+            AudioPart::add($meetingId, $s, $source, is_numeric($d) ? (float) $d : null);
+        }
     }
 
     public function status(Request $r): void

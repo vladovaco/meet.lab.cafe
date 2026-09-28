@@ -8,7 +8,7 @@ $speakerName = static function (?string $label) use ($speakers, $speakerIndex): 
     }
     $s = $speakers[$speakerIndex[$label]];
     return [
-        'name'  => $s['participant_name'] ?? ($s['suggested_name'] ? $s['suggested_name'] . ' ?' : 'Rečník ' . ($speakerIndex[$label] + 1)),
+        'name'  => $s['participant_name'] ?? ($s['suggested_name'] ? $s['suggested_name'] . ' ?' : 'Rečník ' . ($speakerIndex[$label] + 1) . (\App\Models\AudioPart::positionOfLabel($label) > 1 ? ' (časť ' . \App\Models\AudioPart::positionOfLabel($label) . ')' : '')),
         'color' => $s['participant_color'] ?? speaker_color($speakerIndex[$label]),
         'idx'   => $speakerIndex[$label],
     ];
@@ -28,6 +28,7 @@ $analysis = $m['analysis_json'] ? json_decode($m['analysis_json'], true) : null;
   </div>
   <div class="meeting-actions">
     <a class="btn btn-sm" href="<?= url('/meetings/' . $m['id'] . '/edit') ?>">✏️ Upraviť</a>
+    <a class="btn btn-sm" href="<?= url('/meetings/' . $m['id'] . '/continue') ?>" title="Doplniť ďalšiu časť nahrávky do tejto porady">🎙 Pokračovať v nahrávaní</a>
     <a class="btn btn-sm" href="<?= url('/meetings/' . $m['id'] . '/export.md') ?>">⬇ Zápis (.md)</a>
     <a class="btn btn-sm" href="<?= url('/meetings/' . $m['id'] . '/export.txt') ?>">⬇ Prepis (.txt)</a>
     <button type="button" class="btn btn-sm" id="copy-notes">📋 Kopírovať zápis</button>
@@ -43,9 +44,27 @@ $analysis = $m['analysis_json'] ? json_decode($m['analysis_json'], true) : null;
   </div>
 </div>
 
-<?php if ($m['audio_path']): ?>
+<?php if ($m['audio_path']):
+  // časti nahrávky na spoločnej časovej osi (neprepísaná časť ešte nemá offset – dopočíta sa z dĺžok)
+  $playerParts = [];
+  $nextOffset = 0.0;
+  foreach ($parts ?: [['position' => 1, 'offset_sec' => 0, 'duration' => $m['audio_duration'], 'transcribed_at' => null]] as $p) {
+      $offset = $p['transcribed_at'] !== null ? (float) $p['offset_sec'] : $nextOffset;
+      $dur = $p['duration'] !== null ? (float) $p['duration'] : null;
+      $playerParts[] = ['url' => url('/meetings/' . $m['id'] . '/audio?part=' . (int) $p['position']), 'offset' => $offset, 'duration' => $dur];
+      $nextOffset = $offset + (float) $dur;
+  }
+?>
   <div class="card audio-card">
-    <audio id="player" controls preload="metadata" src="<?= url('/meetings/' . $m['id'] . '/audio') ?>"></audio>
+    <audio id="player" controls preload="metadata" src="<?= e($playerParts[0]['url']) ?>" data-parts="<?= e(json_encode($playerParts)) ?>"></audio>
+    <?php if (count($playerParts) > 1): ?>
+      <div class="audio-parts" id="audio-parts">
+        <span class="muted small">Nahrávka má <?= count($playerParts) ?> časti:</span>
+        <?php foreach ($playerParts as $i => $pp): ?>
+          <button type="button" class="btn btn-sm js-part<?= $i === 0 ? ' is-active' : '' ?>" data-part="<?= $i ?>">Časť <?= $i + 1 ?><?= $pp['duration'] ? ' · ' . e(format_duration($pp['duration'])) : '' ?></button>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
   </div>
 <?php endif; ?>
 
