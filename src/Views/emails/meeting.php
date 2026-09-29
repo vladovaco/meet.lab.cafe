@@ -8,6 +8,7 @@ $byKind = ['key_point' => [], 'decision' => [], 'open_question' => []];
 foreach ($points as $p) {
     $byKind[$p['kind']][] = $p['text'];
 }
+$section = static fn(string $key): string => \App\Services\Analysis\RecordingType::section($meeting['recording_type'] ?? null, $key);
 $h2 = 'style="font-size:16px;margin:22px 0 8px;color:#111827"';
 $li = 'style="margin:0 0 6px"';
 ?>
@@ -33,7 +34,7 @@ $li = 'style="margin:0 0 6px"';
     <p style="margin:0"><?= nl2br(e(trim((string) $meeting['summary']))) ?></p>
 
     <?php if ($topics): ?>
-      <h2 <?= $h2 ?>>Priebeh porady</h2>
+      <h2 <?= $h2 ?>><?= e($section('topics')) ?></h2>
       <ol style="padding-left:20px;margin:0">
         <?php foreach ($topics as $t): ?>
           <li <?= $li ?>><strong><?= $t['start_sec'] !== null ? '[' . e(format_duration((float) $t['start_sec'])) . '] ' : '' ?><?= e($t['title']) ?></strong><br><span style="color:#4b5563"><?= e($t['summary']) ?></span></li>
@@ -41,9 +42,9 @@ $li = 'style="margin:0 0 6px"';
       </ol>
     <?php endif; ?>
 
-    <?php foreach ([['key_point', 'Kľúčové body', '•'], ['decision', 'Rozhodnutia', '✅'], ['open_question', 'Otvorené otázky', '❓']] as [$kind, $label, $icon]): ?>
+    <?php foreach ([['key_point', $section('key_point'), '•'], ['decision', $section('decision'), '✅'], ['open_question', $section('open_question'), '❓']] as [$kind, $label, $icon]): ?>
       <?php if ($byKind[$kind]): ?>
-        <h2 <?= $h2 ?>><?= $label ?></h2>
+        <h2 <?= $h2 ?>><?= e($label) ?></h2>
         <ul style="list-style:none;padding:0;margin:0">
           <?php foreach ($byKind[$kind] as $text): ?><li <?= $li ?>><?= $icon ?> <?= e($text) ?></li><?php endforeach; ?>
         </ul>
@@ -51,7 +52,7 @@ $li = 'style="margin:0 0 6px"';
     <?php endforeach; ?>
 
     <?php if ($actionItems): ?>
-      <h2 <?= $h2 ?>>Úlohy</h2>
+      <h2 <?= $h2 ?>><?= e($section('tasks')) ?></h2>
       <table style="border-collapse:collapse;width:100%;font-size:14px">
         <?php foreach ($actionItems as $a): ?>
           <tr>

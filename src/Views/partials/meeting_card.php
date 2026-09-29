@@ -1,7 +1,7 @@
 <?php /** @var array $m */ ?>
 <a class="card meeting-card status-<?= e($m['status']) ?>" href="<?= url('/meetings/' . $m['id']) ?>">
   <div class="meeting-card-head">
-    <span class="meeting-date"><?= e(format_date($m['meeting_date'], 'D j. n. Y · H:i')) ?></span>
+    <span class="meeting-date" title="<?= e(\App\Services\Analysis\RecordingType::label($m['recording_type'] ?? null)) ?>"><?= \App\Services\Analysis\RecordingType::icon($m['recording_type'] ?? null) ?> <?= e(format_date($m['meeting_date'], 'D j. n. Y · H:i')) ?></span>
     <span class="badge badge-status badge-<?= e($m['status']) ?>"><?= e(status_label($m['status'])) ?></span>
   </div>
   <h3 class="meeting-title"><?= e($m['title']) ?></h3>

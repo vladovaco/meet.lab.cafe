@@ -28,7 +28,7 @@ final class MeetingMailer
         }
         $data = self::data($meeting, $includeTranscript);
         $data['note'] = $note;
-        $subject = 'Zápis z porady: ' . $meeting['title'] . ' (' . format_date($meeting['meeting_date'], 'j. n. Y') . ')';
+        $subject = 'Zápis (' . mb_strtolower(\App\Services\Analysis\RecordingType::label($meeting['recording_type'] ?? null)) . '): ' . $meeting['title'] . ' (' . format_date($meeting['meeting_date'], 'j. n. Y') . ')';
         $html = View::partial('emails/meeting', $data);
         $md = View::partial('meetings/export_md', $data);
         $attachments = [['name' => \App\Controllers\MeetingController::slug($meeting['title']) . '-zapis.md', 'content' => $md, 'mime' => 'text/markdown']];

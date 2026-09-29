@@ -317,30 +317,6 @@
   ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('is-over'); }));
   dz.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]; if (f) setFile(f); });
 
-  // Rýchle pridanie účastníka
-  $('#add-participant')?.addEventListener('click', async () => {
-    const input = $('#new-participant');
-    const name = input.value.trim();
-    if (!name) return;
-    try {
-      const r = await api('/api/participants/quick', { name });
-      const chips = $('#participant-chips');
-      let existing = chips.querySelector('input[value="' + r.id + '"]');
-      if (!existing) {
-        const label = document.createElement('label');
-        label.className = 'chip chip-select';
-        label.innerHTML = '<input type="checkbox" name="participants[]" value="' + r.id + '" checked><span></span>';
-        label.querySelector('span').textContent = r.name;
-        chips.appendChild(label);
-      } else {
-        existing.checked = true;
-      }
-      input.value = '';
-      toast(r.existing ? 'Účastník už existoval, označený.' : 'Účastník pridaný.');
-    } catch (e) { toast(e.message, 'error'); }
-  });
-  $('#new-participant')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#add-participant').click(); } });
-
   // Obnova neuloženej nahrávky po páde prehliadača / vybití telefónu
   async function checkRecovery() {
     if (!store) return;

@@ -14,6 +14,7 @@ use App\Models\Meeting;
 use App\Models\Participant;
 use App\Models\AudioPart;
 use App\Models\Tag;
+use App\Services\Analysis\RecordingType;
 use App\Services\JobProcessor;
 use App\Services\Storage;
 
@@ -36,9 +37,10 @@ final class ApiController
         } catch (\Throwable) {
             $dt = new \DateTimeImmutable('now', $tz);
         }
+        $type = RecordingType::normalize($r->str('recording_type'));
         $title = $r->str('title');
         if ($title === '') {
-            $title = 'Porada ' . $dt->format('j. n. Y H:i');
+            $title = RecordingType::defaultTitle($type) . ' ' . $dt->format('j. n. Y H:i');
         }
         $lang = $r->str('language');
         $source = $r->str('source') === 'record' ? 'record' : 'upload';
@@ -51,6 +53,7 @@ final class ApiController
             'location'       => mb_substr($r->str('location'), 0, 160) ?: null,
             'language'       => $lang !== '' && $lang !== 'auto' ? mb_substr($lang, 0, 8) : null,
             'source'         => $source,
+            'recording_type' => $type,
             'status'         => 'queued',
             'audio_path'     => $stored[0]['path'],
             'audio_mime'     => $stored[0]['mime'],
@@ -273,9 +276,37 @@ final class ApiController
         }
         $existing = Participant::matchByName($name);
         if ($existing && Participant::normalize($existing['name']) === Participant::normalize($name)) {
-            Response::json(['ok' => true, 'id' => $existing['id'], 'name' => $existing['name'], 'existing' => true]);
+            Response::json(['ok' => true, 'id' => $existing['id'], 'name' => $existing['name'], 'color' => $existing['color'] ?? null, 'existing' => true]);
         }
         $id = Participant::create(['name' => mb_substr($name, 0, 120), 'position' => mb_substr($r->str('position'), 0, 120) ?: null]);
+        Response::json(['ok' => true, 'id' => $id, 'name' => $name, 'color' => Participant::find($id)['color'] ?? null, 'existing' => false]);
+    }
+
+    /** Rýchle vytvorenie štítka z formulára porady (našepkávač). */
+    public function quickTag(Request $r): void
+    {
+        $name = trim(mb_strtolower(ltrim($r->str('name'), '#')));
+        if ($name === '') {
+            Response::json(['error' => 'Zadajte názov štítka.'], 422);
+        }
+        $existing = DB::one('SELECT id FROM tags WHERE name = ?', [mb_substr($name, 0, 80)]);
+        $id = Tag::ensure($name);
+        $tag = DB::one('SELECT id, name, color FROM tags WHERE id = ?', [$id]);
+        Response::json(['ok' => true, 'id' => $id, 'name' => $tag['name'], 'color' => $tag['color'], 'existing' => $existing !== null]);
+    }
+
+    /** Rýchle vytvorenie priečinka priamo z výberu priečinka. */
+    public function quickFolder(Request $r): void
+    {
+        $name = mb_substr($r->str('name'), 0, 120);
+        if ($name === '') {
+            Response::json(['error' => 'Zadajte názov priečinka.'], 422);
+        }
+        $existing = DB::one('SELECT id, name FROM folders WHERE name = ?', [$name]);
+        if ($existing) {
+            Response::json(['ok' => true, 'id' => (int) $existing['id'], 'name' => $existing['name'], 'existing' => true]);
+        }
+        $id = DB::insert('folders', ['name' => $name, 'color' => speaker_color(crc32($name) % 10)]);
         Response::json(['ok' => true, 'id' => $id, 'name' => $name, 'existing' => false]);
     }
 }

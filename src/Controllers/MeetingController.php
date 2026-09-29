@@ -16,6 +16,7 @@ use App\Models\Job;
 use App\Models\Meeting;
 use App\Models\Participant;
 use App\Models\Tag;
+use App\Services\Analysis\RecordingType;
 use App\Services\CostTracker;
 use App\Services\MeetingMailer;
 use App\Services\Mailer;
@@ -125,7 +126,9 @@ final class MeetingController
         } catch (\Throwable) {
             $dt = new \DateTimeImmutable();
         }
+        $type = RecordingType::normalize($r->str('recording_type') ?: $meeting['recording_type']);
         DB::update('meetings', [
+            'recording_type' => $type,
             'title'        => mb_substr($r->str('title') ?: $meeting['title'], 0, 200),
             'meeting_date' => $dt->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s'),
             'location'     => mb_substr($r->str('location'), 0, 160) ?: null,
@@ -138,6 +141,14 @@ final class MeetingController
         }
         Meeting::syncTags($id, $tagIds);
         Meeting::syncParticipants($id, array_map('intval', (array) $r->input('participants', [])));
+        // iný typ nahrávky = iný zápis → vytvor ho znova (prepis ostáva)
+        if ($type !== RecordingType::normalize($meeting['recording_type']) && !empty($meeting['transcript_text'])) {
+            DB::run('UPDATE jobs SET status = "failed" WHERE meeting_id = ? AND type = "analyze" AND status = "pending"', [$id]);
+            Meeting::setStatus($id, 'queued');
+            Job::enqueue($id, 'analyze');
+            Flash::set('success', 'Uložené. Typ nahrávky sa zmenil na „' . RecordingType::label($type) . '“ – zápis sa vytvorí znova.');
+            Response::redirect('/meetings/' . $id);
+        }
         Flash::set('success', 'Porada bola uložená.');
         Response::redirect('/meetings/' . $id);
     }

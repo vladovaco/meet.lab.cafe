@@ -56,15 +56,21 @@ $parts ??= [];
   <form id="meeting-form" class="form" autocomplete="off"<?= $appendTo ? ' data-action="/api/meetings/' . (int) $appendTo['id'] . '/audio"' : '' ?>>
     <?= Csrf::field() ?>
     <?php if (!$appendTo): ?>
-    <label>Názov porady<input type="text" name="title" class="input" placeholder="napr. Týždenná porada tímu (AI navrhne názov, ak necháte prázdne)"></label>
+    <label>Typ nahrávky
+      <select name="recording_type" class="input">
+        <?php foreach (\App\Services\Analysis\RecordingType::options() as $k => $label): ?><option value="<?= e($k) ?>" <?= $k === \App\Services\Analysis\RecordingType::DEFAULT ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?>
+      </select>
+    </label>
+    <label>Názov<input type="text" name="title" class="input" placeholder="napr. Týždenná porada tímu (AI navrhne názov, ak necháte prázdne)"></label>
     <div class="grid-2">
       <label>Dátum a čas<input type="datetime-local" name="meeting_date" class="input" value="<?= date('Y-m-d\TH:i') ?>"></label>
       <label>Miesto<input type="text" name="location" class="input" placeholder="kancelária, online…"></label>
     </div>
     <div class="grid-2">
       <label>Priečinok
-        <select name="folder_id" class="input"><option value="">– žiadny –</option>
+        <select name="folder_id" class="input js-folder-select"><option value="">– žiadny –</option>
           <?php foreach ($folders as $f): ?><option value="<?= $f['id'] ?>"><?= e($f['name']) ?></option><?php endforeach; ?>
+          <option value="__new">+ Nový priečinok…</option>
         </select>
       </label>
       <label>Jazyk nahrávky
@@ -80,29 +86,15 @@ $parts ??= [];
       </label>
     </div>
 
-    <fieldset class="fieldset">
-      <legend>Účastníci <span class="muted">(pomáha rozpoznať rečníkov)</span></legend>
-      <div class="chips" id="participant-chips">
-        <?php foreach ($participants as $p): ?>
-          <label class="chip chip-select" style="--c:<?= e($p['color']) ?>"><input type="checkbox" name="participants[]" value="<?= $p['id'] ?>"><span><?= e($p['name']) ?></span></label>
-        <?php endforeach; ?>
-      </div>
-      <div class="inline-add">
-        <input type="text" id="new-participant" class="input" placeholder="Pridať nového účastníka…">
-        <button type="button" class="btn" id="add-participant">Pridať</button>
-      </div>
-    </fieldset>
+    <div class="field">
+      <span class="field-label">Účastníci <span class="muted">(pomáha rozpoznať rečníkov)</span></span>
+      <?= \App\Core\View::partial('partials/picker', ['name' => 'participants[]', 'options' => $participants, 'selected' => [], 'create' => 'participant', 'placeholder' => 'Začnite písať meno…']) ?>
+    </div>
 
-    <fieldset class="fieldset">
-      <legend>Štítky</legend>
-      <div class="chips">
-        <?php foreach ($tags as $t): ?>
-          <label class="chip chip-select" style="--c:<?= e($t['color']) ?>"><input type="checkbox" name="tags[]" value="<?= $t['id'] ?>"><span>#<?= e($t['name']) ?></span></label>
-        <?php endforeach; ?>
-      </div>
-      <input type="text" name="new_tags" class="input" placeholder="Nové štítky oddelené čiarkou">
-    </fieldset>
-
+    <div class="field">
+      <span class="field-label">Štítky</span>
+      <?= \App\Core\View::partial('partials/picker', ['name' => 'tags[]', 'options' => $tags, 'selected' => [], 'create' => 'tag', 'prefix' => '#', 'placeholder' => 'Začnite písať štítok…']) ?>
+    </div>
     <?php endif; ?>
 
     <div class="progress" id="upload-progress" hidden><div class="progress-bar"></div><span class="progress-label">Nahráva sa…</span></div>
@@ -110,4 +102,4 @@ $parts ??= [];
     <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn" disabled><?= $appendTo ? 'Pridať do porady a spustiť prepis' : 'Uložiť a spustiť prepis' ?></button>
   </form>
 </div>
-<?php \App\Core\View::addScript('/assets/js/recstore.js'); \App\Core\View::addScript('/assets/js/recorder.js'); ?>
+<?php \App\Core\View::addScript('/assets/js/picker.js'); \App\Core\View::addScript('/assets/js/recstore.js'); \App\Core\View::addScript('/assets/js/recorder.js'); ?>

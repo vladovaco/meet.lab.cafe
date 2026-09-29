@@ -100,6 +100,10 @@ Pri ďalšej zmene stačí push do `main`; nasadenie sa dá spustiť aj ručne c
 
 Nahrávanie z mikrofónu vyžaduje **HTTPS** (okrem `localhost`). iOS Safari nahráva do `audio/mp4`, Android Chrome do `audio/webm` – oba formáty backend prijíma. Počas nahrávania aplikácia drží obrazovku zapnutú (Wake Lock) a každý 5‑sekundový blok hneď zálohuje do IndexedDB v prehliadači. Po vybití telefónu, páde prehliadača alebo obnovení stránky sa pri ďalšom otvorení stránky „Nová porada“ ponúkne obnova neuloženej nahrávky; záloha sa zmaže až po úspešnom uploade na server.
 
+### Typ nahrávky
+
+Pri novej nahrávke (aj pri úprave) sa vyberá typ: **📞 telefonát, 👥 porada, 📊 klientská prezentácia, 💬 rozhovor s terapeutom/coachom/lekárom**. Definície sú v `src/Services/Analysis/RecordingType.php` – pre každý typ rola a pravidlá promptu (čo znamená súhrn, kľúčové body, rozhodnutia, otvorené otázky a úlohy) a názvy sekcií v zápise, e-maile a exporte. JSON schéma výstupu je pre všetky typy rovnaká. Napr. pri prezentácii AI rozlišuje prezentujúcich a klienta a zachytáva reakcie, námietky a nákupné signály; pri konzultácii zapisuje len to, čo zaznelo, bez vlastných diagnóz či rád. Zmena typu pri úprave porady vytvorí zápis znova (prepis sa neopakuje).
+
 ### Pokračovanie v nahrávaní (viac častí jednej porady)
 
 Po stlačení **Zastaviť** sa dá v nahrávaní pokračovať – ďalším stlačením tlačidla nahrávania (pred uložením), alebo neskôr cez **🎙 Pokračovať v nahrávaní** na detaile porady. Dva záznamy z `MediaRecorder` sa nedajú spojiť do jedného súboru bez prekódovania (každý má vlastnú hlavičku a časovú os; na hostingu nie je ffmpeg), preto sa každé pokračovanie uloží ako **ďalšia časť nahrávky tej istej porady** (tabuľka `meeting_audio`).

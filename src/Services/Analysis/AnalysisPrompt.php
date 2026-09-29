@@ -8,24 +8,24 @@ use App\Core\Config;
 /** Spoločný prompt a JSON schéma zápisu – používajú ho všetci AI poskytovatelia (Claude, Gemini). */
 final class AnalysisPrompt
 {
-    public static function system(string $lang): string
+    public static function system(string $lang, ?string $type = null): string
     {
+        $t = RecordingType::get($type);
         return <<<SYS
-Si skúsený zapisovateľ firemných porád. Dostaneš diarizovaný prepis porady (rečníci sú označení technickými labelmi ako speaker_0, speaker_1 a časovou značkou [mm:ss]). Prepis pochádza z automatického rozpoznávania reči, takže môže obsahovať preklepy, chýbajúcu interpunkciu a zle rozpoznané mená – interpretuj ho s rozumom.
+{$t['role']} Rečníci sú v prepise označení technickými labelmi ako speaker_0, speaker_1 a časovou značkou [mm:ss]. Prepis pochádza z automatického rozpoznávania reči, takže môže obsahovať preklepy, chýbajúcu interpunkciu a zle rozpoznané mená – interpretuj ho s rozumom.
 
-Tvoja úloha: vytvoriť presný, vecný a štruktúrovaný zápis z porady v jazyku porady (kód jazyka: {$lang}). Nevymýšľaj si nič, čo v prepise nezaznelo. Ak niečo nie je jasné, radšej to vynechaj alebo označ ako otvorenú otázku.
+Tvoja úloha: vytvoriť presný, vecný a štruktúrovaný záznam v jazyku nahrávky (kód jazyka: {$lang}). Typ nahrávky: {$t['label']}. Nevymýšľaj si nič, čo v prepise nezaznelo. Ak niečo nie je jasné, radšej to vynechaj alebo označ ako otvorenú otázku.
 
-Pravidlá:
-- summary: 3–8 viet, čo bolo cieľom porady a k čomu sa dospelo.
-- topics: chronologické bloky porady (téma + 2–5 viet zhrnutia + čas začiatku v sekundách podľa časovej značky).
-- key_points: najdôležitejšie fakty a informácie, ktoré zazneli (nie rozhodnutia ani úlohy).
-- decisions: len to, na čom sa účastníci naozaj dohodli.
-- open_questions: veci, ktoré ostali nedoriešené.
-- action_items: konkrétne úlohy. assignee = meno osoby tak, ako sa dá z rozhovoru odvodiť (alebo label rečníka, ak meno nepoznáš, napr. "speaker_1"); ak nikto nie je zodpovedný, null. due_date vo formáte YYYY-MM-DD iba ak zaznel termín (relatívne termíny ako "do piatku" prepočítaj podľa dátumu porady), inak null. source_quote = krátky doslovný úryvok z prepisu, z ktorého úloha vyplýva.
+Pravidlá pre tento typ nahrávky:
+{$t['rules']}
+
+Spoločné pravidlá:
+- topics: každý blok = téma + 2–5 viet zhrnutia + čas začiatku v sekundách podľa časovej značky.
+- action_items: assignee = meno osoby tak, ako sa dá z rozhovoru odvodiť (alebo label rečníka, ak meno nepoznáš, napr. "speaker_1"); ak nikto nie je zodpovedný, null. due_date vo formáte YYYY-MM-DD iba ak zaznel termín (relatívne termíny ako "do piatku" prepočítaj podľa dátumu nahrávky), inak null. source_quote = krátky doslovný úryvok z prepisu, z ktorého úloha vyplýva.
 - speakers: pre každý label rečníka odhadni skutočné meno podľa kontextu (oslovenia ako "Peter, čo ty na to", sebapredstavenie, kto koho oslovuje). Preferuj mená zo zoznamu očakávaných účastníkov alebo databázy. confidence 0–1. Ak meno nevieš odhadnúť, name = null.
-- Porada môže byť nahraná vo viacerých častiach (nahrávanie sa zastavilo a pokračovalo). Začiatok ďalšej časti je v prepise označený riadkom "--- Časť N ---". Rečníci ďalších častí majú labely s predponou (p2_speaker_0, p3_speaker_1 …), pretože rozpoznávanie rečníkov prebehlo v každej časti samostatne – ten istý človek môže mať v rôznych častiach iný label. V speakers uveď každý label zvlášť a rovnakému človeku daj vo všetkých častiach rovnaké meno. Zápis (summary, topics, úlohy…) vytvor z celej porady ako jedného celku; časové značky sú už prepočítané na spoločnú časovú os.
+- Nahrávka môže mať viac častí (nahrávanie sa zastavilo a pokračovalo). Začiatok ďalšej časti je v prepise označený riadkom "--- Časť N ---". Rečníci ďalších častí majú labely s predponou (p2_speaker_0, p3_speaker_1 …), pretože rozpoznávanie rečníkov prebehlo v každej časti samostatne – ten istý človek môže mať v rôznych častiach iný label. V speakers uveď každý label zvlášť a rovnakému človeku daj vo všetkých častiach rovnaké meno. Záznam vytvor z celej nahrávky ako jedného celku; časové značky sú už prepočítané na spoločnú časovú os.
 - tags: 2–5 krátkych tematických štítkov (jedno- až dvojslovné, malé písmená).
-- title_suggestion: výstižný názov porady (max 8 slov).
+- title_suggestion: výstižný názov (max 8 slov).
 Odpovedz výhradne JSON objektom podľa zadanej schémy.
 SYS;
     }
@@ -37,6 +37,7 @@ SYS;
     public static function user(array $meeting, array $segments, array $expectedParticipants, array $knownParticipants): string
     {
         $transcript = self::formatTranscript($segments);
+        $type = RecordingType::label($meeting['recording_type'] ?? null);
         $expected = $expectedParticipants === []
             ? 'Neuvedení.'
             : implode("\n", array_map(
@@ -48,8 +49,9 @@ SYS;
             : implode(', ', array_map(fn($p) => $p['name'], array_slice($knownParticipants, 0, 300)));
 
         return <<<USR
-Názov porady: {$meeting['title']}
-Dátum porady: {$meeting['meeting_date']} (UTC)
+Typ nahrávky: {$type}
+Názov: {$meeting['title']}
+Dátum: {$meeting['meeting_date']} (UTC)
 Očakávaní účastníci:
 {$expected}
 

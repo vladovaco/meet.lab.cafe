@@ -267,3 +267,21 @@ mark { background: #fde68a; color: #111; border-radius: 3px; padding: 0 2px; }
 .rec-part { display: grid; gap: .25rem; padding: .5rem; border: 1px solid var(--border, #e5e7eb); border-radius: 10px; }
 .rec-part-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; font-size: .9rem; }
 .rec-part audio { width: 100%; }
+/* Výber s našepkávaním (účastníci, štítky) */
+.field { display: flex; flex-direction: column; gap: .3rem; }
+.field-label { font-size: .85rem; font-weight: 600; }
+.picker { position: relative; }
+.picker-box { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; padding: .35rem .5rem; min-height: 42px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: text; }
+.picker-box:focus-within { outline: 2px solid var(--primary); border-color: transparent; }
+.picker-selected { display: contents; }
+.form .picker .picker-box input.picker-input:not([type=checkbox]):not([type=radio]), .picker-input { flex: 1; min-width: 140px; width: auto; border: 0; outline: 0; padding: .2rem; min-height: 30px; background: transparent; color: var(--text); font: inherit; }
+.form .picker .picker-box input.picker-input:focus { outline: 0; }
+.picker-chip { padding: .2rem .3rem .2rem .6rem; font-size: .85rem; }
+.picker-chip button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 .2rem; opacity: .7; }
+.picker-chip button:hover { opacity: 1; }
+.picker-list { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; margin: 0; padding: .25rem; list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); max-height: 260px; overflow-y: auto; }
+.picker-list li { display: flex; align-items: center; gap: .5rem; padding: .5rem .6rem; border-radius: 8px; cursor: pointer; font-size: .9rem; }
+.picker-list li.is-active { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+.picker-list .picker-create { color: var(--primary); font-weight: 600; }
+.picker-list .picker-empty { color: var(--muted); cursor: default; }
+.picker-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }

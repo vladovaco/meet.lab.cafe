@@ -96,6 +96,8 @@ $router->post('/api/meetings/{id}/speakers', [ApiController::class, 'assignSpeak
 $router->post('/api/meetings/{id}/segments/{segId}', [ApiController::class, 'updateSegment']);
 $router->post('/api/meetings/{id}/summary', [ApiController::class, 'updateSummary']);
 $router->post('/api/participants/quick', [ApiController::class, 'quickParticipant']);
+$router->post('/api/tags/quick', [ApiController::class, 'quickTag']);
+$router->post('/api/folders/quick', [ApiController::class, 'quickFolder']);
 
 try {
     $router->dispatch(new Request());
