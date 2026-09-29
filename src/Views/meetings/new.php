@@ -56,7 +56,12 @@ $parts ??= [];
   <form id="meeting-form" class="form" autocomplete="off"<?= $appendTo ? ' data-action="/api/meetings/' . (int) $appendTo['id'] . '/audio"' : '' ?>>
     <?= Csrf::field() ?>
     <?php if (!$appendTo): ?>
-    <label>Názov porady<input type="text" name="title" class="input" placeholder="napr. Týždenná porada tímu (AI navrhne názov, ak necháte prázdne)"></label>
+    <label>Typ nahrávky
+      <select name="recording_type" class="input">
+        <?php foreach (\App\Services\Analysis\RecordingType::options() as $k => $label): ?><option value="<?= e($k) ?>" <?= $k === \App\Services\Analysis\RecordingType::DEFAULT ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?>
+      </select>
+    </label>
+    <label>Názov<input type="text" name="title" class="input" placeholder="napr. Týždenná porada tímu (AI navrhne názov, ak necháte prázdne)"></label>
     <div class="grid-2">
       <label>Dátum a čas<input type="datetime-local" name="meeting_date" class="input" value="<?= date('Y-m-d\TH:i') ?>"></label>
       <label>Miesto<input type="text" name="location" class="input" placeholder="kancelária, online…"></label>

@@ -48,7 +48,7 @@ final class Meeting
             $params[] = $like;
             $params[] = $like;
         }
-        $sql = 'SELECT m.id, m.title, m.meeting_date, m.status, m.audio_duration, m.summary, m.source, m.folder_id,
+        $sql = 'SELECT m.id, m.title, m.meeting_date, m.status, m.audio_duration, m.summary, m.source, m.recording_type, m.folder_id,
                        f.name AS folder_name, f.color AS folder_color,
                        (SELECT COUNT(*) FROM action_items a WHERE a.meeting_id = m.id AND a.status = "open") AS open_tasks,
                        (SELECT COUNT(*) FROM meeting_speakers s WHERE s.meeting_id = m.id) AS speaker_count

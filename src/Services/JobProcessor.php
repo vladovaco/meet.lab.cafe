@@ -315,7 +315,7 @@ final class JobProcessor
                 'error_message' => null,
             ];
             // ak používateľ nechal predvolený názov, použi návrh AI
-            if (!empty($analysis['title_suggestion']) && preg_match('/^(Porada|Nahrávka|Záznam)\s/u', (string) $meeting['title'])) {
+            if (!empty($analysis['title_suggestion']) && preg_match(\App\Services\Analysis\RecordingType::defaultTitlePattern(), (string) $meeting['title'])) {
                 $update['title'] = mb_substr((string) $analysis['title_suggestion'], 0, 200);
             }
             DB::update('meetings', $update, 'id = ?', [$meetingId]);

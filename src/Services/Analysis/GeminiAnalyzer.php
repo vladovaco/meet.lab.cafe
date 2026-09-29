@@ -28,7 +28,7 @@ final class GeminiAnalyzer implements AnalyzerInterface
 
     public function analyze(array $meeting, array $segments, array $expectedParticipants, array $knownParticipants): array
     {
-        $system = AnalysisPrompt::system(AnalysisPrompt::language($meeting));
+        $system = AnalysisPrompt::system(AnalysisPrompt::language($meeting), $meeting['recording_type'] ?? null);
         $user = AnalysisPrompt::user($meeting, $segments, $expectedParticipants, $knownParticipants);
 
         $body = [

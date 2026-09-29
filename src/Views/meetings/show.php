@@ -13,12 +13,15 @@ $speakerName = static function (?string $label) use ($speakers, $speakerIndex): 
         'idx'   => $speakerIndex[$label],
     ];
 };
+$rt = $m['recording_type'] ?? null;
+$section = static fn(string $key): string => \App\Services\Analysis\RecordingType::section($rt, $key);
 $analysis = $m['analysis_json'] ? json_decode($m['analysis_json'], true) : null;
 ?>
 <div class="meeting-head" data-meeting-id="<?= $m['id'] ?>" data-status="<?= e($m['status']) ?>" data-process-mode="<?= e($processMode) ?>">
   <a class="back" href="<?= url('/') ?>">‹ Porady</a>
   <h1 class="meeting-h1"><?= e($m['title']) ?></h1>
   <div class="meeting-meta">
+    <span><?= \App\Services\Analysis\RecordingType::icon($rt) ?> <?= e(\App\Services\Analysis\RecordingType::label($rt)) ?></span>
     <span>📅 <?= e(format_date($m['meeting_date'], 'l j. n. Y · H:i')) ?></span>
     <?php if ($m['location']): ?><span>📍 <?= e($m['location']) ?></span><?php endif; ?>
     <?php if ($m['audio_duration']): ?><span>⏱ <?= e(format_duration((float) $m['audio_duration'])) ?></span><?php endif; ?>
@@ -101,7 +104,7 @@ $analysis = $m['analysis_json'] ? json_decode($m['analysis_json'], true) : null;
 
   <?php if ($topics): ?>
   <div class="card">
-    <h2 class="h-small">Priebeh porady</h2>
+    <h2 class="h-small"><?= e($section('topics')) ?></h2>
     <ol class="topics">
       <?php foreach ($topics as $t): ?>
         <li>
@@ -113,10 +116,10 @@ $analysis = $m['analysis_json'] ? json_decode($m['analysis_json'], true) : null;
   </div>
   <?php endif; ?>
 
-  <?php foreach ([['key_point', 'Kľúčové body', '•'], ['decision', 'Rozhodnutia', '✅'], ['open_question', 'Otvorené otázky', '❓']] as [$kind, $label, $icon]): ?>
+  <?php foreach ([['key_point', $section('key_point'), '•'], ['decision', $section('decision'), '✅'], ['open_question', $section('open_question'), '❓']] as [$kind, $label, $icon]): ?>
     <?php if (!empty($points[$kind])): ?>
     <div class="card">
-      <h2 class="h-small"><?= $label ?></h2>
+      <h2 class="h-small"><?= e($label) ?></h2>
       <ul class="points">
         <?php foreach ($points[$kind] as $p): ?><li><span class="pt-icon"><?= $icon ?></span><?= e($p['text']) ?></li><?php endforeach; ?>
       </ul>
@@ -126,7 +129,7 @@ $analysis = $m['analysis_json'] ? json_decode($m['analysis_json'], true) : null;
 
   <?php if ($actionItems): ?>
   <div class="card">
-    <h2 class="h-small">Úlohy z porady</h2>
+    <h2 class="h-small"><?= e($section('tasks')) ?></h2>
     <ul class="task-list compact">
       <?php foreach ($actionItems as $a): ?>
         <li class="task <?= $a['status'] === 'done' ? 'is-done' : '' ?>">

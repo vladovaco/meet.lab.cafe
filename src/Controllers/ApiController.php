@@ -14,6 +14,7 @@ use App\Models\Meeting;
 use App\Models\Participant;
 use App\Models\AudioPart;
 use App\Models\Tag;
+use App\Services\Analysis\RecordingType;
 use App\Services\JobProcessor;
 use App\Services\Storage;
 
@@ -36,9 +37,10 @@ final class ApiController
         } catch (\Throwable) {
             $dt = new \DateTimeImmutable('now', $tz);
         }
+        $type = RecordingType::normalize($r->str('recording_type'));
         $title = $r->str('title');
         if ($title === '') {
-            $title = 'Porada ' . $dt->format('j. n. Y H:i');
+            $title = RecordingType::defaultTitle($type) . ' ' . $dt->format('j. n. Y H:i');
         }
         $lang = $r->str('language');
         $source = $r->str('source') === 'record' ? 'record' : 'upload';
@@ -51,6 +53,7 @@ final class ApiController
             'location'       => mb_substr($r->str('location'), 0, 160) ?: null,
             'language'       => $lang !== '' && $lang !== 'auto' ? mb_substr($lang, 0, 8) : null,
             'source'         => $source,
+            'recording_type' => $type,
             'status'         => 'queued',
             'audio_path'     => $stored[0]['path'],
             'audio_mime'     => $stored[0]['mime'],
